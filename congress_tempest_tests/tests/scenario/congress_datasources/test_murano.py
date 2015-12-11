@@ -41,7 +41,6 @@ class TestMuranoDriver(manager_congress.ScenarioPolicyBase):
         self.congress_client = (
             self.admin_manager.congress_client)
 
-    @decorators.skip_because(bug='1486246')
     @test.attr(type='smoke')
     @test.services('compute')
     def test_murano_predeployment(self):
@@ -63,6 +62,8 @@ class TestMuranoDriver(manager_congress.ScenarioPolicyBase):
             return resp['name']
 
         def _create_datasource():
+            import pdb
+            pdb.set_trace()
             body = {"config": {"username": CONF.identity.admin_username,
                                "tenant_name": CONF.identity.admin_tenant_name,
                                "password": CONF.identity.admin_password,
