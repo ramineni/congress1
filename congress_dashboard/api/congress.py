@@ -16,8 +16,11 @@ from oslo_log import log as logging
 
 from django.conf import settings
 from congressclient.v1 import client as congress_client
-import keystoneclient
+import keystoneauth1.identity.v2 as v2
+import keystoneauth1.identity.v3 as v3
+import keystoneauth1.session as kssession
 from openstack_dashboard.api import base
+from six.moves.urllib import parse as urlparse
 
 
 LITERALS_SEPARATOR = '),'
@@ -70,14 +73,30 @@ class PolicyTable(PolicyAPIDictWrapper):
         self._apidict['policy_owner_id'] = policy['owner_id']
 
 
+def get_keystone_session(auth_url, user):
+    url_parts = urlparse.urlparse(auth_url)
+    path = url_parts.path.lower()
+    if path.startswith('/v3'):
+        # Use v3 plugin to authenticate
+        auth = v3.Token(
+            auth_url=auth_url, token=user.token.id,
+            project_name=user.project_name, domain_name=user.user_domain_name,
+            project_domain_name=(getattr(user, 'project_domain_name', None) or
+                                 'default'))
+    else:
+        # Use v2 plugin
+        auth = v2.Token(auth_url=auth_url, token=user.token.id,
+                        tenant_id=user.tenant_id, tenant_name=user.tenant_name)
+
+    session = kssession.Session(auth=auth)
+    return session
+
+
 def congressclient(request):
     """Instantiate Congress client."""
     auth_url = getattr(settings, 'OPENSTACK_KEYSTONE_URL')
     user = request.user
-    auth = keystoneclient.auth.identity.v2.Token(auth_url, user.token.id,
-                                                 tenant_id=user.tenant_id,
-                                                 tenant_name=user.tenant_name)
-    session = keystoneclient.session.Session(auth=auth)
+    session = get_keystone_session(auth_url, user)
     region_name = user.services_region
 
     kwargs = {
