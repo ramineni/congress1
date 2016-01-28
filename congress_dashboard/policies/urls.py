@@ -14,9 +14,8 @@
 
 from django.conf.urls import patterns
 from django.conf.urls import url
-from openstack_dashboard.dashboards.admin.policies.rules import (
-    views as rule_views)
-from openstack_dashboard.dashboards.admin.policies import views
+from congress_dashboard.policies.rules import views as rule_views
+from congress_dashboard.policies import views
 
 
 POLICY = r'^(?P<policy_name>[^/]+)/%s$'

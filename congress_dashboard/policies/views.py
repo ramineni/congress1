@@ -24,13 +24,10 @@ from horizon import forms
 from horizon import messages
 from horizon import tables
 from openstack_dashboard.api import congress
-import openstack_dashboard.dashboards.admin.datasources.utils as ds_utils
-from openstack_dashboard.dashboards.admin.policies import (
-    forms as policies_forms)
-from openstack_dashboard.dashboards.admin.policies import (
-    tables as policies_tables)
-from openstack_dashboard.dashboards.admin.policies.rules import (
-    tables as rules_tables)
+import congress_dashboard.datasources.utils as ds_utils
+from congress_dashboard.policies import forms as policies_forms
+from congress_dashboard.policies import tables as policies_tables
+from congress_dashboard.policies.rules import tables as rules_tables
 
 
 LOG = logging.getLogger(__name__)

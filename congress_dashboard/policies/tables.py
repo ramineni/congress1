@@ -20,7 +20,7 @@ from django.utils.translation import ungettext_lazy
 from horizon import exceptions
 from horizon import messages
 from horizon import tables
-from openstack_dashboard.api import congress
+from congress_dashboard.api import congress
 from openstack_dashboard import policy
 
 

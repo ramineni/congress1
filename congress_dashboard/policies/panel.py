@@ -14,7 +14,7 @@
 
 from django.utils.translation import ugettext_lazy as _
 import horizon
-from openstack_dashboard.dashboards.admin import dashboard
+from congress_dashboard import dashboard
 
 
 class Policies(horizon.Panel):
@@ -23,4 +23,4 @@ class Policies(horizon.Panel):
     permissions = ('openstack.roles.admin',)
 
 
-dashboard.Admin.register(Policies)
+dashboard.Congress.register(Policies)

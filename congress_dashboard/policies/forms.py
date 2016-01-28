@@ -19,7 +19,7 @@ from django.utils.translation import ugettext_lazy as _
 from horizon import exceptions
 from horizon import forms
 from horizon import messages
-from openstack_dashboard.api import congress
+from congress_dashboard.api import congress
 
 
 LOG = logging.getLogger(__name__)

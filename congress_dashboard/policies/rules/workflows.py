@@ -23,7 +23,7 @@ from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 from horizon import forms
 from horizon import workflows
-from openstack_dashboard.api import congress
+from congress_dashboard.api import congress
 
 
 COLUMN_FORMAT = '<datasource>%s<table> <column>' % congress.TABLE_SEPARATOR
