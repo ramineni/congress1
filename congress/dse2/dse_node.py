@@ -23,6 +23,7 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 
 from congress.dse2.control_bus import DseNodeControlBus
+from congress import exception
 
 LOG = logging.getLogger()
 
@@ -77,7 +78,8 @@ class DseNode(object):
         self._services = []
         self.instance = uuid.uuid4()
         self.context = self._message_context()
-        self.transport = messaging.get_transport(self.messaging_config)
+        self.transport = messaging.get_transport(self.messaging_config,
+            allowed_remote_exmods = [exception.__name__, ])
         self._rpctarget = self.node_rpc_target(self.node_id, self.node_id)
         self._rpcserver = messaging.get_rpc_server(
             self.transport, self._rpctarget, self.node_rpc_endpoints,

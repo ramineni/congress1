@@ -752,7 +752,13 @@ class Runtime (object):
         if th_name in self.theory.keys():
             return self.tablenames(theory_name=th_name, include_modal=False)
 
-    def get_row_data(self, table_id, policy_name, trace=False):
+    def get_row_data(self, table_id, source_id, trace=False):
+        # source_id is the policy name.  But it needs to stay 'source_id'
+        #  since RPC calls invoke by the name of the argument, and we're
+        #  currently assuming the implementations of get_row_data in
+        #  the policy engine, datasources, and datasource manager all
+        #  use the same argument names.
+        policy_name = source_id
         tablename = self.get_tablename(policy_name, table_id)
         if not tablename:
             raise exception.NotFound("table '%s' doesn't exist" % table_id)
@@ -2112,3 +2118,6 @@ class Dse2RuntimeEndpoints(object):
                  delta=False, trace=False, as_list=False):
         return self.dse.simulate(query, theory, sequence, action_theory,
                                  delta, trace, as_list)
+
+    def get_row_data(self, context, table_id, source_id, trace=False):
+        return self.dse.get_row_data(table_id, source_id, trace)

@@ -17,11 +17,18 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+# Use new deepsix when appropriate
+from oslo_config import cfg
+if (hasattr(cfg.CONF, 'distributed_architecture')
+   and cfg.CONF.distributed_architecture):
+    from congress.dse2 import deepsix2 as deepsix
+else:
+    from congress.dse import deepsix
+
 from oslo_log import log as logging
 
 from congress.api import api_utils
 from congress.api import webservice
-from congress.dse import deepsix
 from congress import exception
 
 
@@ -34,20 +41,25 @@ LOG = logging.getLogger(__name__)
 
 class RowModel(deepsix.deepSix):
     """Model for handling API requests about Tables."""
-    def __init__(self, name, keys, inbox=None, dataPath=None,
+    def __init__(self, name, keys='', inbox=None, dataPath=None,
                  policy_engine=None, datasource_mgr=None):
         super(RowModel, self).__init__(name, keys, inbox=inbox,
                                        dataPath=dataPath)
         self.engine = policy_engine
         self.datasource_mgr = datasource_mgr
 
-    def rpc(self, caller, name, *args, **kwargs):
-        try:
-            f = getattr(caller, name)
-        except AttributeError:
-            raise exception.CongressException('method: %s is not defined in %s'
-                                              % (name, caller.__name__))
-        return f(*args, **kwargs)
+    def my_rpc(self, caller, name, kwargs):
+        if (hasattr(cfg.CONF, 'distributed_architecture')
+           and cfg.CONF.distributed_architecture):
+            return self.rpc(caller, name, kwargs)
+        else:
+            try:
+                f = getattr(caller, name)
+            except AttributeError:
+                raise exception.CongressException(
+                    'method: %s is not defined in %s' % (
+                        name, caller.__name__))
+            return f(**kwargs)
 
     # TODO(thinrichs): No rows have IDs right now.  Maybe eventually
     #   could make ID the hash of the row, but then might as well
@@ -82,23 +94,33 @@ class RowModel(deepsix.deepSix):
             gen_trace = True
 
         # Get the caller, it should be either policy or datasource
-        caller, source_id = api_utils.get_id_from_context(context,
-                                                          self.datasource_mgr,
-                                                          self.engine)
+        if (hasattr(cfg.CONF, 'distributed_architecture')
+           and cfg.CONF.distributed_architecture):
+            caller, source_id = api_utils.get_id_from_context2(
+                context, self.engine)
+        else:
+            caller, source_id = api_utils.get_id_from_context(
+                context, self.datasource_mgr, self.engine)
+
         table_id = context['table_id']
         try:
-            result = self.rpc(caller, 'get_row_data', table_id, source_id,
-                              trace=gen_trace)
+            args = {'table_id': table_id, 'source_id': source_id,
+                    'trace': gen_trace}
+            result = self.my_rpc(caller, 'get_row_data', args)
         except exception.CongressException as e:
             m = ("Error occurred while processing source_id '%s' for row "
                  "data of the table '%s'" % (source_id, table_id))
             LOG.exception(m)
+            #raise webservice.DataModelException(404, m, None, 404)
             raise webservice.DataModelException.create(e)
 
-        if gen_trace and caller is not self.datasource_mgr:
+        if gen_trace and caller is self.engine:
+            # DSE2 returns lists instead of tuples, so correct that.
+            result[0] = [{'data': tuple(x['data'])} for x in result[0]]
             return {'results': result[0],
                     'trace': result[1] or "Not available"}
         else:
+            result = [{'data': tuple(x['data'])} for x in result]
             return {'results': result}
 
     # TODO(thinrichs): It makes sense to sometimes allow users to create

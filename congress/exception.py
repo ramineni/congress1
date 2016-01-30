@@ -124,6 +124,7 @@ class BadRequest(CongressException):
 class NotFound(CongressException):
     msg_fmt = _("Resource not found.")
     code = 404
+    name = 'NotFound'
 
 
 class PolicyNotAuthorized(Forbidden):
