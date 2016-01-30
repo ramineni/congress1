@@ -45,3 +45,18 @@ def get_id_from_context(context, datasource_mgr, policy_engine):
         except webservice.DataModelException:
             LOG.exception(msg)
             raise
+
+
+def get_id_from_context2(context, policy_engine):
+    if 'ds_id' in context:
+        return context.get('ds_id'), context.get('ds_id')
+    elif 'policy_id' in context:
+        return policy_engine, context.get('policy_id')
+    else:
+        msg = "Internal error: context %s should have included " % str(context)
+        "either ds_id or policy_id"
+        try:  # Py3: ensure LOG.exception is inside except
+            raise webservice.DataModelException('404', msg)
+        except webservice.DataModelException:
+            LOG.exception(msg)
+            raise

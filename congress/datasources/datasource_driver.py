@@ -328,6 +328,10 @@ class DataSourceDriver(deepsix.deepSix):
         #   this because it will publish info to the bus.
         super(DataSourceDriver, self).__init__(name, keys, inbox, datapath)
 
+        # For DSE2.  Must go after __init__
+        if hasattr(self, 'add_rpc_endpoint'):
+            self.add_rpc_endpoint(DataSourceDriverEndpoints(self))
+
     def get_snapshot(self, table_name):
         print("datasource_driver get_snapshot(%s); %s" % (
             table_name, self.state))
@@ -595,7 +599,7 @@ class DataSourceDriver(deepsix.deepSix):
         """
         return set(cls.get_schema().keys())
 
-    def get_row_data(self, table_id, **kwargs):
+    def get_row_data(self, table_id, *args, **kwargs):
         """Gets row data for a give table."""
         results = []
         try:
@@ -1126,6 +1130,14 @@ class DataSourceDriver(deepsix.deepSix):
                 'password': '',
                 'auth_url': '',
                 'tenant_name': ''}
+
+
+class DataSourceDriverEndpoints(object):
+    def __init__(self, ds):
+        self.ds = ds
+
+    def get_row_data(self, context, table_id, source_id, trace):
+        return self.ds.get_row_data(table_id, source_id, trace)
 
 
 class PollingDataSourceDriver(DataSourceDriver):
