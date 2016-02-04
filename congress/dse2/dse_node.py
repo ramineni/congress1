@@ -23,6 +23,7 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 
 from congress.dse2.control_bus import DseNodeControlBus
+from congress import exception
 
 LOG = logging.getLogger()
 
@@ -115,6 +116,9 @@ class DseNode(object):
         if hidden:
             return self._services
         return [s for s in self._services if s.service_id[0] != '_']
+
+    def get_services_id(self):
+        return [service.service_id for service in self._services]
 
     def service_object(self, name):
         """Returns the service object of the given name.  None if not found."""
@@ -209,6 +213,10 @@ class DseNode(object):
 
         Raises: MessagingTimeout, RemoteError, MessageDeliveryFailure
         """
+        # Check if service exists, else raise error
+        if service_id not in self.get_services_id():
+            msg = "Service %s is not a valid service"
+            raise exception.CongressException(msg % service_id)
         target = self.service_rpc_target(service_id)
         LOG.trace("<%s> Invoking RPC '%s' on %s", self.node_id, method, target)
         client = messaging.RPCClient(self.transport, target)

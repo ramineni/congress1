@@ -32,7 +32,11 @@ def create_table_dict(tablename, schema):
             'columns': cols}
 
 
-def get_id_from_context(context, datasource_mgr, policy_engine):
+def get_id_from_context(context, datasource_mgr=None, policy_engine=None,
+                        dist_arch=False):
+    if dist_arch:
+        datasource_mgr = context.get('ds_id')
+
     if 'ds_id' in context:
         return datasource_mgr, context.get('ds_id')
     elif 'policy_id' in context:
