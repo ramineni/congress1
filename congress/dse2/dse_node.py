@@ -22,6 +22,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
+from congress import exception
 from congress.dse2.control_bus import DseNodeControlBus
 
 LOG = logging.getLogger()
@@ -31,6 +32,7 @@ _dse_opts = [
     cfg.StrOpt('node_id', help='Unique ID of this DseNode on the DSE')
 ]
 cfg.CONF.register_opts(_dse_opts, group='dse')
+EXMODS = [ exception.__name__, ]
 
 
 class DseNode(object):
@@ -77,7 +79,8 @@ class DseNode(object):
         self._services = []
         self.instance = uuid.uuid4()
         self.context = self._message_context()
-        self.transport = messaging.get_transport(self.messaging_config)
+        self.transport = messaging.get_transport(self.messaging_config,
+                                                 allowed_remote_exmods = EXMODS)
         self._rpctarget = self.node_rpc_target(self.node_id, self.node_id)
         self._rpcserver = messaging.get_rpc_server(
             self.transport, self._rpctarget, self.node_rpc_endpoints,
@@ -207,8 +210,12 @@ class DseNode(object):
         Returns:
             The result of the method invocation.
 
-        Raises: MessagingTimeout, RemoteError, MessageDeliveryFailure
+        Raises: MessagingTimeout, RemoteError, MessageDeliveryFailure, NotFound
         """
+        if not self.service_object(service_id):
+            msg = "service '%s' is not a registered service"
+            raise exception.NotFound(msg % service_id)
+
         target = self.service_rpc_target(service_id)
         LOG.trace("<%s> Invoking RPC '%s' on %s", self.node_id, method, target)
         client = messaging.RPCClient(self.transport, target)
@@ -229,6 +236,10 @@ class DseNode(object):
 
         Raises: RemoteError, MessageDeliveryFailure
         """
+        if not self.service_object(service_id):
+            msg = "service '%s' is not a registered service"
+            raise exception.NotFound(msg % service_id)
+
         target = self.service_rpc_target(service_id, fanout=True)
         LOG.trace("<%s> Casting RPC '%s' on %s", self.node_id, method, target)
         client = messaging.RPCClient(self.transport, target)
