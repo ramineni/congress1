@@ -589,7 +589,9 @@ class DataSourceDriver(deepsix.deepSix):
     @classmethod
     def get_tablename(cls, table_id):
         """Get a table name."""
-        return table_id if table_id in cls.get_tablenames() else None
+        #raise exception.CongressException("test hello")
+        raise exception.NotFound(_("hello testing"))
+        #return table_id if table_id in cls.get_tablenames() else None
 
     @classmethod
     def get_tablenames(cls):

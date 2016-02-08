@@ -24,6 +24,7 @@ import oslo_messaging as messaging
 
 from congress import exception
 from congress.dse2.control_bus import DseNodeControlBus
+from congress.dse2 import common
 
 LOG = logging.getLogger()
 
@@ -82,6 +83,8 @@ class DseNode(object):
         self.transport = messaging.get_transport(self.messaging_config,
                                                  allowed_remote_exmods = EXMODS)
         self._rpctarget = self.node_rpc_target(self.node_id, self.node_id)
+#        self.serializer = common.RequestContextSerializer(
+#                                    common.JsonPayloadSerializer())
         self._rpcserver = messaging.get_rpc_server(
             self.transport, self._rpctarget, self.node_rpc_endpoints,
             executor='eventlet')
@@ -219,7 +222,13 @@ class DseNode(object):
         target = self.service_rpc_target(service_id)
         LOG.trace("<%s> Invoking RPC '%s' on %s", self.node_id, method, target)
         client = messaging.RPCClient(self.transport, target)
-        result = client.call(self.context, method, **kwargs)
+        try:
+            result = client.call(self.context, method, **kwargs)
+        except Exception as e:
+            import pdb
+            pdb.set_trace()
+            print "exception occured"
+            raise
         LOG.trace("<%s> RPC call returned: %s", self.node_id, result)
         return result
 

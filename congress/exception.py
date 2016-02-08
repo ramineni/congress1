@@ -86,7 +86,7 @@ class CongressException(Exception):
                 # log the issue and the kwargs
                 LOG.exception(_('Exception in string format operation'))
                 for name, value in kwargs.items():
-                    LOG.error("%s: %s", name, value)    # noqa
+                    LOG.error(_("%s: %s", name, value))    # noqa
 
                 if CONF.fatal_exception_format_errors:
                     six.reraise(exc_info[0], exc_info[1], exc_info[2])
@@ -95,6 +95,17 @@ class CongressException(Exception):
                     message = self.msg_fmt
 
         super(CongressException, self).__init__(message)
+
+    def __str__(self):
+        """Encode to utf-8 then wsme api can consume it as well."""
+        if not six.PY3:
+            return unicode(self.args[0]).encode('utf-8')
+
+        return self.args[0]
+
+    def __unicode__(self):
+        """Return a unicode representation of the exception message."""
+        return unicode(self.args[0])
 
     def format_message(self):
         # NOTE(mrodden): use the first argument to the python Exception object

@@ -23,6 +23,7 @@ cfg.CONF.distributed_architecture = True
 from congress.api import policy_model
 from congress.api import rule_model
 from congress.api import table_model
+from congress.api import webservice
 from congress.tests import base
 from congress.tests2.api import base as api_base
 
@@ -58,19 +59,6 @@ class TestTableModel(base.SqlTestCase):
         # create policy
         self.policy_model.add_item({"name": 'test-policy'}, {})
 
-    def test_get_datasource_table_with_id(self):
-        context = {'ds_id': self.data.service_id,
-                   'table_id': 'fake_table'}
-        expected_ret = {'id': 'fake_table'}
-        ret = self.table_model.get_item('fake_table', {}, context)
-        self.assertEqual(expected_ret, ret)
-
-    def test_get_datasource_table_with_name(self):
-        context = {'ds_id': self.data.service_id,
-                   'table_id': 'fake_table'}
-        expected_ret = {'id': 'fake_table'}
-        ret = self.table_model.get_item('fake_table', {}, context)
-        self.assertEqual(expected_ret, ret)
 
 # TODO(dse2): Enable these tests once returning proper exceptions
 # This test should ideally raise congress exception instead of None,
@@ -87,8 +75,10 @@ class TestTableModel(base.SqlTestCase):
         context = {'ds_id': self.data.service_id,
                    'table_id': 'invalid-table'}
         expected_ret = None
-        ret = self.table_model.get_item('invalid-table', {}, context)
-        self.assertEqual(expected_ret, ret)
+        self.assertRaises(webservice.DataModelException, self.table_model.get_item,
+                          'invalid-table', {}, context)
+        #ret = self.table_model.get_item('invalid-table', {}, context)
+        #self.assertEqual(expected_ret, ret)
 
     def test_get_policy_table(self):
         context = {'policy_id': 'test-policy',

@@ -21,6 +21,8 @@ from oslo_log import log as logging
 
 from congress.api import api_utils
 from congress.api import base
+from congress.api import webservice
+from congress import exception
 
 LOG = logging.getLogger(__name__)
 
@@ -57,7 +59,11 @@ class TableModel(base.APIModel):
             self.distributed_architecture)
 
         args = {'source_id': source_id, 'table_id': id_}
-        tablename = self.invoke_rpc(caller, 'get_tablename', args)
+        try:
+            tablename = self.invoke_rpc(caller, 'get_tablename', args)
+        except exception.CongressException as e:
+            LOG.exception(e)
+            raise webservice.DataModelException.create(e)
         if tablename:
             return {'id': tablename}
 

@@ -13,7 +13,7 @@
 #    under the License.
 #
 
-import json
+from oslo_serialization import jsonutils as json
 
 
 class DataServiceInfo(object):
