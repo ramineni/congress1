@@ -70,6 +70,11 @@ class TestRowModel(base.SqlTestCase):
         ret = self.row_model.get_items({}, context)
         self.assertEqual(expected_ret, ret)
 
+        ret = self.row_model.get_items({'trace': 'true'}, context)
+        import pdb
+        pdb.set_trace()
+        self.assertTrue('trace' in ret, "Rows should have trace")
+
     def test_get_items_invalid_ds_name(self):
         context = {'ds_id': 'invalid-ds',
                    'table_id': 'fake-table'}

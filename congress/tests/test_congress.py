@@ -176,6 +176,8 @@ class TestCongress(base.SqlTestCase):
 
         # Send formula
         formula = test_neutron.create_network_group('p')
+        import pdb
+        pdb.set_trace()
         LOG.debug("Sending formula: %s", formula)
         api['rule'].publish(
             'policy-update', [compile.Event(formula, target=policy)])
