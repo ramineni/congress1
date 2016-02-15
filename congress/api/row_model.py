@@ -34,12 +34,6 @@ def d6service(name, keys, inbox, datapath, args):
 
 class RowModel(base.APIModel):
     """Model for handling API requests about Rows."""
-    def __init__(self, name, keys='', inbox=None, dataPath=None,
-                 policy_engine=None, datasource_mgr=None):
-        super(RowModel, self).__init__(name, keys, inbox=inbox,
-                                       dataPath=dataPath,
-                                       policy_engine=policy_engine,
-                                       datasource_mgr=datasource_mgr)
 
     # TODO(thinrichs): No rows have IDs right now.  Maybe eventually
     #   could make ID the hash of the row, but then might as well
