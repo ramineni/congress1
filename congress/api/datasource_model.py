@@ -21,6 +21,7 @@ import json
 
 from oslo_log import log as logging
 
+from congress.api import base
 from congress.api import error_codes
 from congress.api import webservice
 from congress.dse import deepsix
@@ -35,12 +36,13 @@ def d6service(name, keys, inbox, datapath, args):
     return DatasourceModel(name, keys, inbox=inbox, dataPath=datapath, **args)
 
 
-class DatasourceModel(deepsix.deepSix):
+class DatasourceModel(base.APIModel):
     """Model for handling API requests about Datasources."""
-    def __init__(self, name, keys, inbox=None, dataPath=None,
-                 policy_engine=None, datasource_mgr=None, synchronizer=None):
+    def __init__(self, name, keys='', inbox=None, dataPath=None,
+                 policy_engine=None, datasource_mgr=None, bus=None,
+                 synchronizer=None):
         super(DatasourceModel, self).__init__(name, keys, inbox=inbox,
-                                              dataPath=dataPath)
+                                              dataPath=dataPath, bus=bus)
         self.engine = policy_engine
         self.datasource_mgr = datasource_mgr
         self.synchronizer = synchronizer
