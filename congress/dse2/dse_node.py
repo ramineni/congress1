@@ -152,6 +152,9 @@ class DseNode(object):
         self._running = True
 
     def stop(self):
+        if self._running is False:
+            return
+
         LOG.info("Stopping DSE node '%s'" % self.node_id)
         for srpc, target in self._service_rpc_servers.values():
             srpc.stop()

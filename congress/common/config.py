@@ -23,7 +23,6 @@ from oslo_db import options as db_options
 from oslo_log import log as logging
 from oslo_policy import opts as policy_opts
 
-from congress.managers import datasource as datasource_mgr
 from congress import version
 
 LOG = logging.getLogger(__name__)
@@ -86,11 +85,19 @@ db_options.set_defaults(cfg.CONF,
                         max_overflow=20, pool_timeout=10)
 
 
+WITHOUT_ENGINE = '--without-engine'
+WITHOUT_API = '--without-api'
+
+
 def init(args, **kwargs):
+    if args.count(WITHOUT_ENGINE):
+        args.remove(WITHOUT_ENGINE)
+    if args.count(WITHOUT_API):
+        args.remove(WITHOUT_API)
+
     cfg.CONF(args=args, project='congress',
              version='%%(prog)s %s' % version.version_info.release_string(),
              **kwargs)
-    datasource_mgr.DataSourceManager.validate_configured_drivers()
 
 
 def setup_logging():

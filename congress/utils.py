@@ -22,6 +22,7 @@ from __future__ import absolute_import
 
 import contextlib
 import json
+import os
 import shutil
 import tempfile
 
@@ -72,6 +73,16 @@ def value_to_congress(value):
           isinstance(value, float)):
         return value
     return str(value)
+
+
+def get_path():
+    root_path = cfg.CONF.root_path
+    if root_path is None:
+        root_path = os.path.dirname(__file__)   # drop filename
+        root_path = os.path.dirname(root_path)  # drop to congress src dir
+    data_path = cfg.CONF.datasource_file
+
+    return root_path, data_path
 
 
 class Location (object):
