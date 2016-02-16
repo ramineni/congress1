@@ -26,10 +26,12 @@ import sys
 from oslo_config import cfg
 from oslo_log import log as logging
 
+from congress import exception
 from congress.api import application
 from congress.api import action_model
 from congress.api import datasource_model
 from congress.api import policy_model
+from congress.api import router
 from congress.api import row_model
 from congress.api import rule_model
 from congress.api import schema_model
@@ -38,16 +40,14 @@ from congress.api import table_model
 from congress.api.system import driver_model
 from congress.datalog import base
 from congress.dse import d6cage
-from congress.dse2 import dse_node
 from congress.policy_engines.agnostic import Dse2Runtime
-from congress import exception
 from congress.managers import datasource as datasource_manager
-from congress.api import router
 from congress.tests import helper
 
 
 LOG = logging.getLogger(__name__)
 ENGINE_SERVICE_NAME = 'engine'
+
 
 def create(rootdir, config_override=None):
     """Get Congress up and running when src is installed in rootdir.
@@ -65,13 +65,13 @@ def create(rootdir, config_override=None):
     cage = d6cage.d6Cage()
 
     # read in datasource configurations
-
     cage.config = config_override or {}
 
     # path to congress source dir
     src_path = os.path.join(rootdir, "congress")
 
     datasource_mgr = datasource_manager.DataSourceManager()
+    datasource_mgr.validate_configured_drivers()
 
     # add policy engine
     engine_path = os.path.join(src_path, "policy_engines/agnostic.py")
@@ -266,7 +266,7 @@ def create(rootdir, config_override=None):
     return cage
 
 
-def create2(rootdir, config_override=None):
+def create2(rootdir, config_override=None, bus=None):
     """Get Congress up and running when src is installed in rootdir.
 
     i.e. ROOTDIR=/path/to/congress/congress.
@@ -280,17 +280,13 @@ def create2(rootdir, config_override=None):
 
     # create services
     services = {}
-    services[ENGINE_SERVICE_NAME] = create_policy_engine()
+    services[ENGINE_SERVICE_NAME] = bus.service_object(ENGINE_SERVICE_NAME)
     services['api'], services['api_service'] = create_api(
         services[ENGINE_SERVICE_NAME])
     services['datasources'] = create_datasources(services[ENGINE_SERVICE_NAME])
 
     # create message bus and attach services
-    messaging_config = helper.generate_messaging_config()
-    bus = dse_node.DseNode(messaging_config, "root", [])
-    bus.config = config_override or {}
-    if getattr(cfg.CONF, "distributed_arch", False):
-        bus.register_service(services[ENGINE_SERVICE_NAME])
+    if getattr(cfg.CONF, "distributed_architecture", False):
         for ds in services['datasources']:
             bus.register_service(ds)
         bus.register_service(services['api_service'])
