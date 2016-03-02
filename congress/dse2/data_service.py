@@ -203,6 +203,9 @@ class DataService(object):
             "get_snapshot is not implemented in the '%s' class." %
             self.service_id)
 
+    def is_valid_service(self, service_id):
+        return self.node.is_valid_service(service_id)
+
 
 class DataServiceEndPoints (object):
     def __init__(self, service):

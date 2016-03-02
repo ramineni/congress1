@@ -2015,9 +2015,8 @@ class Dse2Runtime(DseRuntime):
         """Overloading the DseRuntime version of _rpc so it uses dse2."""
         return self.rpc(service_name, action, args)
 
-    # TODO(dse2): fill this in once we know how to check
     def service_exists(self, service_name):
-        return True
+        return self.is_valid_service(service_name)
 
     def receive_data(self, publisher, table, data):
         """Event handler for when a dataservice publishes data.
