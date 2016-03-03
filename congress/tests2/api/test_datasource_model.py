@@ -17,6 +17,8 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+import mock
+
 from oslo_config import cfg
 cfg.CONF.distributed_architecture = True
 
@@ -24,15 +26,24 @@ from congress.api import datasource_model
 from congress.api import webservice
 from congress import exception
 from congress.tests import base
+from congress.tests import helper
 from congress.tests2.api import base as api_base
+from congress.datasources import nova_driver
+
+import novaclient.client
 
 
 class TestDatasourceModel(base.SqlTestCase):
-    def setUp(self):
+    @mock.patch.object(novaclient.client, 'Client')
+    def setUp(self, client_mock):
         super(TestDatasourceModel, self).setUp()
         self.datasource_model = datasource_model.DatasourceModel(
             'test_datasource', policy_engine='engine')
-        self.config = api_base.setup_config([self.datasource_model])
+        fake_config = {'auth_url': 'foo', 'username': 'armax', 'password':'aa',
+                       'tenant_name': 'armax'}
+        self.nova_driver = nova_driver.NovaDriver('nova', args=fake_config)
+        self.config = api_base.setup_config([self.datasource_model,
+                                             self.nova_driver])
         self.data = self.config['data']
         self.node = self.config['node']
         self.engine = self.config['engine']
@@ -97,5 +108,42 @@ class TestDatasourceModel(base.SqlTestCase):
         self.assertRaises(webservice.DataModelException,
                           self.datasource_model.delete_item,
                           None, {}, context=context)
+
+    def test_execute_action(self):
+        def _execute_api(client, action, action_args):                          
+            LOG.info("_execute_api called on %s and %s", action, action_args)   
+            positional_args = action_args['positional']                         
+            named_args = action_args['named']                                   
+            method = reduce(getattr, action.split('.'), client)                 
+            method(*positional_args, **named_args)                              
+                                                                                
+        class NovaClient(object):                                               
+            def __init__(self, testkey):                                        
+                self.testkey = testkey                                          
+                                                                                
+            def _get_testkey(self):                                             
+                return self.testkey                                             
+                                                                                
+            def disconnectNetwork(self, arg1, arg2, arg3):                      
+                self.testkey = "arg1=%s arg2=%s arg3=%s" % (arg1, arg2, arg3)   
+                                                                                
+        nova_client = NovaClient("testing")                                     
+        nova = self.cage.service_object('nova')                                 
+        nova._execute_api = _execute_api                                        
+        nova.nova_client = nova_client                                          
+                                                                                
+        api = self.api                                                          
+        body = {'name': 'nova:disconnectNetwork',                               
+                'args': {'positional': ['value1', 'value2'],                    
+                         'named': {'arg3': 'value3'}}}                          
+                                                                                
+
+        context = {'ds_id': self.data.service_id}
+        body = {'name': 'fake_act',                                           
+                'args': {'positional': ['value1', 'value2'],                    
+                         'named': {'name': 'value3'}}}
+        request = helper.FakeRequest(body)
+        result = self.datasource_model.execute_action({}, context, request)
+        
 
 # TODO(ramineni): Migrate request_refresh and exeucte_action tests

@@ -66,3 +66,12 @@ class FakeDataSource(datasource_driver.PollingDataSourceDriver,
 
     def update_from_datasource(self):
         LOG.info("fake:: update_from_datasource")
+
+    def execute(self, action, action_args):
+        func = getattr(self, action, None)
+        if func and self.is_executable(func):
+            return func(action_args)
+
+    def fake_act(self, args):
+        print('fake action')
+        print('done')

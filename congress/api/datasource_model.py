@@ -151,7 +151,7 @@ class DatasourceModel(base.APIModel):
         try:
             args = {'service_name': service, 'action': action,
                     'action_args': action_args}
-            self.invoke_rpc(self.engine, 'execute_action', args)
+            self.invoke_rpc(service, 'execute_action', args)
         except exception.PolicyException as e:
             (num, desc) = error_codes.get('execute_error')
             raise webservice.DataModelException(num, desc + "::" + str(e))
