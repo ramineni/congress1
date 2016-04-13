@@ -15,7 +15,8 @@
 import logging
 
 from congressclient.v1 import client as congress_client
-import keystoneclient
+from keystoneauth1.identity import v2
+from keystoneauth1.session as kssession
 from openstack_dashboard.api import base
 
 
@@ -73,10 +74,9 @@ def congressclient(request):
     """Instantiate Congress client."""
     auth_url = base.url_for(request, 'identity')
     user = request.user
-    auth = keystoneclient.auth.identity.v2.Token(auth_url, user.token.id,
-                                                 tenant_id=user.tenant_id,
-                                                 tenant_name=user.tenant_name)
-    session = keystoneclient.session.Session(auth=auth)
+    auth = v2.Token(auth_url, user.token.id, tenant_id=user.tenant_id,
+                    tenant_name=user.tenant_name)
+    session = kssession.Session(auth=auth)
     region_name = user.services_region
 
     kwargs = {
