@@ -24,16 +24,22 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+import mock
+from mox3 import mox
+
 from oslo_config import cfg
 cfg.CONF.distributed_architecture = True
-
 from oslo_log import log as logging
+import neutronclient.v2_0
 
 from congress.common import config
 from congress import harness
 from congress.tests import base
 from congress.tests import helper
 from congress.tests2.api import base as api_base
+import congress.tests.datasources.test_neutron_driver as test_neutron
+from congress.datasources import neutronv2_driver
+from congress.datasources import nova_driver
 
 
 LOG = logging.getLogger(__name__)
@@ -47,6 +53,39 @@ class TestCongress(base.SqlTestCase):
         self.services = api_base.setup_config(with_fake_datasource=False)
         self.api = self.services['api']
         self.node = self.services['node']
+        self.engine = self.services['engine']
+        mock_factory = mox.Mox()
+#        neutron_mock = mock_factory.CreateMock(neutronclient.v2_0.client.Client)
+#        neutron_mock2 = mock_factory.CreateMock(neutronclient.v2_0.client.Client)
+        args = helper.datasource_openstack_args()
+        self.neutronv2 = neutronv2_driver.NeutronV2Driver('neutronv2', args=args)
+        self.node.register_service(self.neutronv2)
+        neutron_mock = mock.MagicMock(spec=neutronclient.v2_0.client.Client)
+        neutron_mock2 = mock.MagicMock(spec=neutronclient.v2_0.client.Client)
+
+        self.neutronv2.neutron = neutron_mock
+        # initialize neutron_mocks
+        network1 = test_neutron.network_response
+        port_response = test_neutron.port_response
+        router_response = test_neutron.router_response
+        sg_group_response = test_neutron.security_group_response
+        neutron_mock.list_networks.return_value = network1
+        neutron_mock.list_ports.return_value = port_response
+        neutron_mock.list_routers.return_value = router_response
+        neutron_mock.list_security_groups.return_value = sg_group_response
+        
+        #neutron_mock.list_networks().InAnyOrder().AndReturn(network1)
+        #neutron_mock.list_ports().InAnyOrder().AndReturn(port_response)
+        #neutron_mock.list_routers().InAnyOrder().AndReturn(router_response)
+        #neutron_mock.list_security_groups().InAnyOrder().AndReturn(
+        #    sg_group_response)
+        neutron_mock2.list_networks().InAnyOrder().AndReturn(network1)
+        neutron_mock2.list_ports().InAnyOrder().AndReturn(port_response)
+        neutron_mock2.list_routers().InAnyOrder().AndReturn(router_response)
+        neutron_mock2.list_security_groups().InAnyOrder().AndReturn(
+            sg_group_response)
+        mock_factory.ReplayAll()
+
 
     def setup_config(self):
         args = ['--config-file', helper.etcdir('congress.conf.test')]
@@ -106,6 +145,92 @@ class TestCongress(base.SqlTestCase):
         context = {'policy_id': policyname,
                    'table_id': tablename}
         return self.api['api-row'].get_items({}, context)
+
+    def test_rule_insert_delete(self):
+        self.api['api-policy'].add_item({'name': 'alice'}, {})
+        context = {'policy_id': 'alice'}
+        (id1, _) = self.api['api-rule'].add_item(
+            {'rule': 'p(x) :- plus(y, 1, x), q(y)'}, {}, context=context)
+        ds = self.api['api-rule'].get_items({}, context)['results']
+        self.assertEqual(len(ds), 1)
+        self.api['api-rule'].delete_item(id1, {}, context)
+        ds = self.engine.policy_object('alice').content()
+        self.assertEqual(len(ds), 0)
+
+    def test_datasource_request_refresh(self):
+        # Remember that neutron does not poll automatically here, which
+        #   is why this test actually testing request_refresh
+        neutron = self.neutronv2
+        LOG.info("neutron.state: %s", neutron.state)
+        self.assertEqual(len(neutron.state['ports']), 0)
+        # TODO(thinrichs): Seems we can't test the datasource API at all.
+        #api['datasource-model'].request_refresh_action(
+        #     {}, context, helper.FakeRequest({}))
+        neutron.request_refresh()
+        f = lambda: len(neutron.state['ports'])
+        helper.retry_check_function_return_value_not_eq(f, 0)
+
+    def test_policy_api_model_execute(self):
+        def _execute_api(client, action, action_args):
+            LOG.info("_execute_api called on %s and %s", action, action_args)
+            positional_args = action_args['positional']
+            named_args = action_args['named']
+            method = reduce(getattr, action.split('.'), client)
+            method(*positional_args, **named_args)
+
+        class NovaClient(object):
+            def __init__(self, testkey):
+                self.testkey = testkey
+
+            def _get_testkey(self):
+                return self.testkey
+
+            def disconnectNetwork(self, arg1, arg2, arg3):
+                self.testkey = "arg1=%s arg2=%s arg3=%s" % (arg1, arg2, arg3)
+
+        nova_client = NovaClient("testing")
+        args = helper.datasource_openstack_args()
+        nova = nova_driver.NovaDriver('nova', args=args)
+        self.node.register_service(nova)
+        nova._execute_api = _execute_api
+        nova.nova_client = nova_client
+
+        api = self.api
+        body = {'name': 'nova:disconnectNetwork',
+                'args': {'positional': ['value1', 'value2'],
+                         'named': {'arg3': 'value3'}}}
+
+        request = helper.FakeRequest(body)
+        result = api['api-policy'].execute_action({}, {}, request)
+        self.assertEqual(result, {})
+
+        expected_result = "arg1=value1 arg2=value2 arg3=value3"
+        f = nova.nova_client._get_testkey
+        helper.retry_check_function_return_value(f, expected_result)
+
+
+
+
+#    def test_neutron(self):
+#        """Test polling and publishing of neutron updates."""
+#        engine = self.engine
+#        api = self.api
+#        #cage = self.cage
+#        policy = 'classification'#engine.DEFAULT_THEORY
+#
+#        # Send formula
+#        formula = test_neutron.create_network_group('p')
+#        LOG.debug("Sending formula: %s", formula)
+#        api['api-rule'].publish(
+#            'policy-update', [compile.Event(formula, target=policy)])
+#        helper.retry_check_nonempty_last_policy_change(engine)
+#        LOG.debug("All services: %s", cage.services.keys())
+#        #neutron = cage.service_object('neutron')
+#        self.neutronv2.poll()
+#        ans = ('p("240ff9df-df35-43ae-9df5-27fae87f2492") ')
+#        helper.retry_check_db_equal(engine, 'p(x)', ans, target=policy)
+#
+
 
 
 # TODO(dse2): port this test
@@ -313,64 +438,6 @@ class TestCongress(base.SqlTestCase):
 #             self.assertEqual(set(datasources),
 #                              set(['neutron', 'neutron2', 'nova']))
 
-#     def test_row_api_model(self):
-#         """Test the row api model."""
-#         self.skipTest("Move to test/api/test_row_api_model..")
-#         api = self.api
-#         engine = self.engine
-#         # add some rules defining tables
-#         context = {'policy_id': engine.DEFAULT_THEORY}
-#         api['rule'].add_item(
-#             {'rule': 'p(x) :- q(x)'},
-#             {}, context=context)
-#         api['rule'].add_item(
-#             {'rule': 'p(x) :- r(x)'},
-#             {}, context=context)
-#         api['rule'].add_item(
-#             {'rule': 'q(x) :- r(x)'},
-#             {}, context=context)
-#         api['rule'].add_item(
-#             {'rule': 'r(1) :- true'},
-#             {}, context=context)
-
-#         # without tracing
-#         context['table_id'] = 'p'
-#         ans = api['row'].get_items({}, context=context)
-#         s = frozenset([tuple(x['data']) for x in ans['results']])
-#         t = frozenset([(1,)])
-#         self.assertEqual(s, t, "Rows without tracing")
-#         self.assertTrue('trace' not in ans, "Rows should have no Trace")
-#         self.assertEqual(len(ans['results']), 1)  # no duplicates
-
-#         # with tracing
-#         ans = api['row'].get_items({'trace': 'true'}, context=context)
-#         s = frozenset([tuple(x['data']) for x in ans['results']])
-#         t = frozenset([(1,)])
-#         self.assertEqual(s, t, "Rows with tracing")
-#         self.assertTrue('trace' in ans, "Rows should have trace")
-#         self.assertEqual(len(ans['trace'].split('\n')), 16)
-
-#         # unknown policy table
-#         context = {'policy_id': engine.DEFAULT_THEORY,
-#                    'table_id': 'unktable'}
-#         ans = api['row'].get_items({}, context=context)
-#         self.assertEqual(len(ans['results']), 0)
-
-#         # unknown policy
-#         context = {'policy_id': 'unkpolicy', 'table_id': 'unktable'}
-#         ans = api['row'].get_items({}, context=context)
-#         self.assertEqual(len(ans['results']), 0)
-
-#         # unknown datasource table
-#         context = {'ds_id': 'neutron', 'table_id': 'unktable'}
-#         ans = api['row'].get_items({}, context=context)
-#         self.assertEqual(len(ans['results']), 0)
-
-#         # unknown datasource
-#         context = {'ds_id': 'unkds', 'table_id': 'unktable'}
-#         ans = api['row'].get_items({}, context=context)
-#         self.assertEqual(len(ans['results']), 0)
-
 #     def test_policy_api_model_execute(self):
 #         def _execute_api(client, action, action_args):
 #             LOG.info("_execute_api called on %s and %s", action, action_args)
@@ -407,16 +474,6 @@ class TestCongress(base.SqlTestCase):
 #         f = nova.nova_client._get_testkey
 #         helper.retry_check_function_return_value(f, expected_result)
 
-#     def test_rule_insert_delete(self):
-#         self.api['policy'].add_item({'name': 'alice'}, {})
-#         context = {'policy_id': 'alice'}
-#         (id1, _) = self.api['rule'].add_item(
-#             {'rule': 'p(x) :- plus(y, 1, x), q(y)'}, {}, context=context)
-#         ds = self.api['rule'].get_items({}, context)['results']
-#         self.assertEqual(len(ds), 1)
-#         self.api['rule'].delete_item(id1, {}, context)
-#         ds = self.engine.policy_object('alice').content()
-#         self.assertEqual(len(ds), 0)
 
 #     # TODO(thinrichs): Clean up this file.  In particular, make it possible
 #     #   to group all of the policy-execute tests into their own class.
