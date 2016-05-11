@@ -45,8 +45,9 @@ def fail_gracefully(f):
 def congress_app_factory(global_conf, **local_conf):
     if getattr(cfg.CONF, "distributed_architecture", False):
         # global_conf only accepts an iteratable value as a its dict value
-        dse_node = global_conf['node_obj'][0]
-        services = harness.create2(node=dse_node)
+        dse_node = global_conf['server_data']['node']
+        policy_engine = global_conf['server_data']['policy_service']
+        services = harness.create2(node=dse_node, policy_service=policy_engine)
         return application.ApiApplication(services['api_service'])
 
     else:

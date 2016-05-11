@@ -90,7 +90,16 @@ db_options.set_defaults(cfg.CONF,
                         max_overflow=20, pool_timeout=10)
 
 
+WITHOUT_ENGINE = '--without-engine'
+WITHOUT_API = '--without-api'
+
+
 def init(args, **kwargs):
+    if args.count(WITHOUT_ENGINE):
+        args.remove(WITHOUT_ENGINE)
+    if args.count(WITHOUT_API):
+        args.remove(WITHOUT_API)
+
     cfg.CONF(args=args, project='congress',
              version='%%(prog)s %s' % version.version_info.release_string(),
              **kwargs)

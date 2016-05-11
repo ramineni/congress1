@@ -36,6 +36,7 @@ from paste import deploy
 
 from congress.dse2 import dse_node
 from congress import exception
+from congress import harness
 from congress.tests import helper
 
 LOG = logging.getLogger(__name__)
@@ -64,6 +65,27 @@ class EventletFilteringLogger(object):
             self.logger.log(self.level, msg.rstrip())
 
 
+class Server(service.Service):
+    """Server class to Data Service Node without API services."""
+    def __init__(self, name, policy_engine=False):
+        super(Server, self).__init__()
+        self.name = name
+
+        messaging_config = helper.generate_messaging_config()
+        messaging_config.rpc_response_timeout = 10
+        self.node = dse_node.DseNode(messaging_config, self.name, [])
+
+        # create and register datasource service and PolicyEngine
+        harness.create2(self.node, api_service=False,
+                        policy_service=policy_engine)
+
+    def start(self):
+        self.node.start()
+
+    def stop(self):
+        self.node.stop()
+
+
 class APIServer(service.ServiceBase):
     """Server class to Data Service Node with API services.
 
@@ -71,7 +93,7 @@ class APIServer(service.ServiceBase):
     """
 
     def __init__(self, app_conf, name, host=None, port=None, threads=1000,
-                 keepalive=False, keepidle=None):
+                 keepalive=False, keepidle=None, policy_engine=False):
         self.app_conf = app_conf
         self.name = name
         self.application = None
@@ -86,6 +108,7 @@ class APIServer(service.ServiceBase):
         self.keepidle = keepidle
         self.socket = None
         self.node = None
+        self.policy_engine = policy_engine
 
         if cfg.CONF.distributed_architecture:
             messaging_config = helper.generate_messaging_config()
@@ -100,10 +123,15 @@ class APIServer(service.ServiceBase):
             self.listen(key=key, backlog=backlog)
 
         try:
-            kwargs = {'global_conf': {'node_obj': [self.node]}}
+            kwargs = {
+                'global_conf': {
+                    'server_data': {
+                        'node': self.node,
+                        'policy_service': self.policy_engine}}}
             self.application = deploy.loadapp('config:%s' % self.app_conf,
                                               name='congress', **kwargs)
         except Exception:
+            LOG.exception('Failed to Start %s server' % self.node.node_id)
             raise exception.CongressException(
                 'Failed to Start initializing %s server' % self.node.node_id)
 

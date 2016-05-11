@@ -269,7 +269,7 @@ def create(rootdir, config_override=None):
     return cage
 
 
-def create2(node=None):
+def create2(node=None, api_service=True, policy_service=True):
     """Get Congress up.
 
     :param node is a DseNode
@@ -291,7 +291,12 @@ def create2(node=None):
     services['datasources'] = create_datasources(
         bus, services[ENGINE_SERVICE_NAME])
 
-    bus.register_service(services[ENGINE_SERVICE_NAME])
+    if api_service:
+        bus.register_service(services['api_service'])
+
+    if policy_service:
+        bus.register_service(services[ENGINE_SERVICE_NAME])
+
     for ds in services['datasources']:
         bus.register_service(ds)
         try:
@@ -303,8 +308,6 @@ def create2(node=None):
                 exception.DatasourceCreationError) as e:
             LOG.exception("Datasource %s creation failed. %s" % (ds, e))
             bus.unregister_service(ds)
-
-    bus.register_service(services['api_service'])
 
     # TODO(dse2): Need this?
     # initialize_policy_engine(services[ENGINE_SERVICE_NAME], services['api'])
