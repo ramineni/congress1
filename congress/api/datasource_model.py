@@ -138,6 +138,14 @@ class DatasourceModel(base.APIModel):
 
     def execute_action(self, params, context=None, request=None):
         "Execute the action."
+        if not cfg.CONF.enable_execute_action:
+            LOG.info("action %s is called with args %s on %s, but "
+                     "current configuration doesn't allow Congress to "
+                     "execute any action.", action, action_args, service_name)
+            return
+
+        caller, source_id = api_utils.get_id_from_context(context,
+                                                          self.datasource_mgr)
         service = context.get('ds_id')
         body = json.loads(request.body)
         action = body.get('name')
@@ -145,13 +153,17 @@ class DatasourceModel(base.APIModel):
         if (not isinstance(action_args, dict)):
             (num, desc) = error_codes.get('execute_action_args_syntax')
             raise webservice.DataModelException(num, desc)
-
         try:
-            args = {'service_name': service, 'action': action,
-                    'action_args': action_args}
-            self.invoke_rpc(self.engine, 'execute_action', args)
-        except exception.PolicyException as e:
+            if self.dist_arch:
+                args = {'action': action, 'action_args': action_args}
+                self.invoke_rpc(caller, 'execute_action', args)
+            else:
+                args = {'service_name': service, 'action': action,
+                        'action_args': action_args}
+                self.invoke_rpc(self.engine, 'execute_action', args)
+        except Exception as e:
             (num, desc) = error_codes.get('execute_error')
+            LOG.exeception(e)
             raise webservice.DataModelException(num, desc + "::" + str(e))
 
         return {}

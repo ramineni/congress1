@@ -159,6 +159,9 @@ class DataService(object):
             kwargs = {}
         return self.node.invoke_service_rpc(service, action, **kwargs)
 
+    def is_valid_service(self, service):
+        return self.node.is_valid_service(service)
+
     # Will be removed once the reference of node exists in api
     def get_datasources(self, filter_secret=False):
         return self.node.get_datasources(filter_secret)

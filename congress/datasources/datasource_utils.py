@@ -58,6 +58,24 @@ def update_state_on_changed(root_table_name):
         return inner
     return outer
 
+def record_execution(f):
+    def log(self, action, action_args, logger, *args, **kw):
+        if logger is not None:
+            pos_args = ''
+            if 'positional' in action_args:
+                pos_args = ", ".join(str(x) for x in
+                           action_args['positional'])
+            named_args = ''
+            if 'named' in action_args:
+                named_args = ", ".join("%s=%s" % (key, val)
+                    for key, val in action_args['named'].items())
+            delimit = ''
+            if pos_args and named_args:
+                delimit = ', '
+            logger.info("Executing %s:%s(%s%s%s)",
+                        self.name, action, pos_args, delimit, named_args)
+        return f(self, action, action_args, logger)
+    return log
 
 def add_column(colname, desc=None):
     """Adds column in the form of dict."""
@@ -144,3 +162,29 @@ def inspect_methods(client, api_prefix):
                             obj_stack.append(p)
 
     return allmethods
+
+class ExecutionLogger(object):
+    """Logger for logging the execution"""
+    def __init__(self):
+        self.messages = []
+
+    def debug(self, msg, *args):
+        self.messages.append(msg % args)
+
+    def info(self, msg, *args):
+        self.messages.append(msg % args)
+
+    def warn(self, msg, *args):
+        self.messages.append(msg % args)
+
+    def error(self, msg, *args):
+        self.messages.append(msg % args)
+
+    def critical(self, msg, *args):
+        self.messages.append(msg % args)
+
+    def content(self):
+        return '\n'.join(self.messages)
+
+    def empty(self):
+        self.messages = []

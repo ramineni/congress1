@@ -1178,6 +1178,10 @@ class DataSourceDriverEndpoints(data_service.DataServiceEndPoints):
     def request_refresh(self, context, source_id):
         return self.service.request_refresh()
 
+    def execute_action(self, context, action, action_args):
+        exlogger = self.service.exclogger
+        return self.service.execute_action(action, action_args, exlogger)
+
 
 class PushedDataSourceDriver(DataSourceDriver):
     """Push Type DataSource Driver.
@@ -1334,6 +1338,10 @@ class PollingDataSourceDriver(DataSourceDriver):
             else:
                 self.block_unless_refresh_requested()
 
+    @ds_utils.record_execution
+    def execute_action(self, action, action_args, logger):
+        self.execute(action, action_args)
+
 
 class ExecutionDriver(object):
     """An add-on class for action execution.
@@ -1349,6 +1357,8 @@ class ExecutionDriver(object):
     def __init__(self):
         # a list of action methods which can be used with "execute"
         self.executable_methods = {}
+        # record the execution
+        self.exclogger = ds_utils.ExecutionLogger()
 
     def reqhandler(self, msg):
         """Request handler.
