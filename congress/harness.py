@@ -380,10 +380,17 @@ def create_datasources(bus):
         if not ds['enabled']:
             LOG.info("module %s not enabled, skip loading", ds_dict['name'])
             continue
+        # Check driver is enabled in config, if not update the DB
+        try:
+            driver_info = bus.get_driver_info(ds_dict['driver'])
+        except exception.DriverNotFound:
+            # Driver is not enabled in config, so change the ds state in DB
+            ds.enabled = False
+            db_datasources.update_datasource(ds)
+            continue
 
         LOG.info("create configured datasource service %s." % ds_dict['name'])
         try:
-            driver_info = bus.get_driver_info(ds_dict['driver'])
             service = bus.create_service(
                 class_path=driver_info['module'],
                 kwargs={'name': ds_dict['name'], 'args': ds_dict['config']})

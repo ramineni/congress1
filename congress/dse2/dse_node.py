@@ -164,6 +164,9 @@ class DseNode(object):
     # Note(thread-safety): blocking function
     def unregister_service(self, service_id):
         service = self.service_object(service_id)
+        if not service:
+            # service is not running, return
+            return
         self._services = [s for s in self._services
                           if s.service_id != service_id]
         service.stop()
@@ -494,7 +497,7 @@ class DseNode(object):
         results = []
         for datasource in datasources_db.get_datasources():
             result = self.make_datasource_dict(datasource)
-            if filter_secret:
+            if filter_secret and result['enabled']:
                 # driver_info knows which fields should be secret
                 driver_info = self.get_driver_info(result['driver'])
                 try:

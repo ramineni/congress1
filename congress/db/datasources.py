@@ -60,6 +60,12 @@ def add_datasource(id_, name, driver, config, description,
     return datasource
 
 
+def update_datasource(ds, session=None):
+    session = session or db.get_session()
+    return (session.query(Datasource).
+            filter(Datasource.id == ds.id).update(ds))
+
+
 def delete_datasource(id_, session=None):
     session = session or db.get_session()
     return session.query(Datasource).filter(
