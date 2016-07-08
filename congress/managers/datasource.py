@@ -29,7 +29,6 @@ import six
 
 from congress.datalog import base
 from congress.datasources import constants
-from congress.db import api as db
 from congress.db import datasources as datasources_db
 from congress.dse import d6cage
 from congress import exception
@@ -327,29 +326,26 @@ class DataSourceManager(object):
     def delete_datasource(cls, datasource_id, update_db=True):
         # Note(thread-safety): blocking call
         datasource = cls.get_datasource(datasource_id)
-        session = db.get_session()
-        with session.begin(subtransactions=True):
-            cage = cls.dseNode or d6cage.d6Cage()
-            engine = cage.service_object('engine')
-            try:
-                engine.delete_policy(datasource['name'],
-                                     disallow_dangling_refs=True)
-            except exception.DanglingReference as e:
-                raise e
-            except KeyError:
+        cage = cls.dseNode or d6cage.d6Cage()
+        engine = cage.service_object('engine')
+        try:
+            engine.delete_policy(datasource['name'],
+                                 disallow_dangling_refs=True)
+        except exception.DanglingReference as e:
+            raise e
+        except KeyError:
+            raise exception.DatasourceNotFound(id=datasource_id)
+        if update_db:
+            # Note(thread-safety): blocking call
+            result = datasources_db.delete_datasource(datasource_id)
+            if not result:
                 raise exception.DatasourceNotFound(id=datasource_id)
-            if update_db:
-                # Note(thread-safety): blocking call
-                result = datasources_db.delete_datasource(
-                    datasource_id, session)
-                if not result:
-                    raise exception.DatasourceNotFound(id=datasource_id)
-            if cls.dseNode:
-                # Note(thread-safety): blocking call
-                cls.dseNode.unregister_service(
-                    cls.dseNode.service_object(datasource['name']))
-            else:
-                cage.deleteservice(datasource['name'])
+        if cls.dseNode:
+            # Note(thread-safety): blocking call
+            cls.dseNode.unregister_service(
+                cls.dseNode.service_object(datasource['name']))
+        else:
+            cage.deleteservice(datasource['name'])
 
     @classmethod
     def get_status(cls, source_id=None, params=None):
