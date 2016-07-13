@@ -151,8 +151,6 @@ def main():
     deploy_datasources = cfg.CONF.datasources
 
     if deploy_api or deploy_policy or deploy_datasources:
-        if not cfg.CONF.distributed_architecture:
-            sys.exit("ERROR: can only be used with distributed arch")
         if (cfg.CONF.node_id is None and
            not (deploy_api and deploy_policy and deploy_datasources)):
             sys.exit("ERROR: must supply unique node_id")
