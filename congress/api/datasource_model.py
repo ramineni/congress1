@@ -19,7 +19,6 @@ from __future__ import absolute_import
 
 import json
 
-from oslo_config import cfg
 from oslo_log import log as logging
 
 from congress.api import api_utils
@@ -47,7 +46,7 @@ class DatasourceModel(base.APIModel):
                                               datasource_mgr=datasource_mgr,
                                               bus=bus)
         self.synchronizer = synchronizer
-        self.dist_arch = getattr(cfg.CONF, 'distributed_architecture', False)
+        self.dist_arch = True
 
     # Note(thread-safety): blocking function
     def get_items(self, params, context=None):
@@ -62,11 +61,9 @@ class DatasourceModel(base.APIModel):
                  a list of items in the model.  Additional keys set in the
                  dict will also be rendered for the user.
         """
-        if self.dist_arch:
-            self.datasource_mgr = self.bus
 
         # Note(thread-safety): blocking call
-        results = self.datasource_mgr.get_datasources(filter_secret=True)
+        results = self.bus.get_datasources(filter_secret=True)
 
         # Check that running datasources match the datasources in the
         # database since this is going to tell the client about those
@@ -96,15 +93,11 @@ class DatasourceModel(base.APIModel):
          """
         obj = None
         try:
-            if self.dist_arch:
-                # Note(thread-safety): blocking call
-                obj = self.bus.add_datasource(item=item)
-                # Note(thread-safety): blocking call
-                utils.create_datasource_policy(self.bus, obj['name'],
-                                               self.engine)
-            else:
-                # Note(thread-safety): blocking call
-                obj = self.datasource_mgr.add_datasource(item=item)
+            # Note(thread-safety): blocking call
+            obj = self.bus.add_datasource(item=item)
+            # Note(thread-safety): blocking call
+            utils.create_datasource_policy(self.bus, obj['name'],
+                                           self.engine)
         except (exception.BadConfig,
                 exception.DatasourceNameInUse,
                 exception.DriverNotFound,
