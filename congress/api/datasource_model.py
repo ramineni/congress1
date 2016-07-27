@@ -31,22 +31,8 @@ from congress import utils
 LOG = logging.getLogger(__name__)
 
 
-def d6service(name, keys, inbox, datapath, args):
-    return DatasourceModel(name, keys, inbox=inbox, dataPath=datapath, **args)
-
-
 class DatasourceModel(base.APIModel):
     """Model for handling API requests about Datasources."""
-    def __init__(self, name, keys='', inbox=None, dataPath=None,
-                 policy_engine=None, datasource_mgr=None, bus=None,
-                 synchronizer=None):
-        super(DatasourceModel, self).__init__(name, keys, inbox=inbox,
-                                              dataPath=dataPath,
-                                              policy_engine=policy_engine,
-                                              datasource_mgr=datasource_mgr,
-                                              bus=bus)
-        self.synchronizer = synchronizer
-        self.dist_arch = True
 
     # Note(thread-safety): blocking function
     def get_items(self, params, context=None):
@@ -70,10 +56,6 @@ class DatasourceModel(base.APIModel):
         # datasources, and the running datasources should match the
         # datasources we show the client.
 
-        # TODO(ramineni): Need to move this to new architecture
-        if self.synchronizer:
-            # Note(thread-safety): blocking call
-            self.synchronizer.synchronize_datasources()
         return {"results": results}
 
     # Note(thread-safety): blocking function
@@ -96,8 +78,7 @@ class DatasourceModel(base.APIModel):
             # Note(thread-safety): blocking call
             obj = self.bus.add_datasource(item=item)
             # Note(thread-safety): blocking call
-            utils.create_datasource_policy(self.bus, obj['name'],
-                                           self.engine)
+            utils.create_datasource_policy(self.bus, obj['name'], 'engine')
         except (exception.BadConfig,
                 exception.DatasourceNameInUse,
                 exception.DriverNotFound,
@@ -116,42 +97,37 @@ class DatasourceModel(base.APIModel):
     def delete_item(self, id_, params, context=None):
         ds_id = context.get('ds_id')
         try:
-            if self.dist_arch:
-                # Note(thread-safety): blocking call
-                datasource = self.bus.get_datasource(ds_id)
-                args = {'name': datasource['name'],
-                        'disallow_dangling_refs': True}
-                # FIXME(thread-safety):
-                #  by the time greenthread resumes, the
-                #  returned datasource name could refer to a totally different
-                #  datasource, causing the rest of this code to unintentionally
-                #  delete a different datasource
-                #  Fix: check UUID of datasource before operating.
-                #  Abort if mismatch
+            # Note(thread-safety): blocking call
+            datasource = self.bus.get_datasource(ds_id)
+            args = {'name': datasource['name'],
+                    'disallow_dangling_refs': True}
+            # FIXME(thread-safety):
+            #  by the time greenthread resumes, the
+            #  returned datasource name could refer to a totally different
+            #  datasource, causing the rest of this code to unintentionally
+            #  delete a different datasource
+            #  Fix: check UUID of datasource before operating.
+            #  Abort if mismatch
 
-                # Note(thread-safety): blocking call
-                self.invoke_rpc(self.engine, 'delete_policy', args)
-                # FIXME(thread-safety):
-                #  by the time greenthread resumes, the
-                #  returned datasource name could refer to a totally different
-                #  datasource, causing the rest of this code to unintentionally
-                #  delete a different datasource
-                #  Fix: check UUID of datasource before operating.
-                #  Abort if mismatch
+            # Note(thread-safety): blocking call
+            self.invoke_rpc('engine', 'delete_policy', args)
+            # FIXME(thread-safety):
+            #  by the time greenthread resumes, the
+            #  returned datasource name could refer to a totally different
+            #  datasource, causing the rest of this code to unintentionally
+            #  delete a different datasource
+            #  Fix: check UUID of datasource before operating.
+            #  Abort if mismatch
 
-                # Note(thread-safety): blocking call
-                self.bus.delete_datasource(datasource)
-            else:
-                # Note(thread-safety): blocking call
-                self.datasource_mgr.delete_datasource(ds_id)
+            # Note(thread-safety): blocking call
+            self.bus.delete_datasource(datasource)
         except (exception.DatasourceNotFound,
                 exception.DanglingReference) as e:
             raise webservice.DataModelException(e.code, e.message)
 
     # Note(thread-safety): blocking function
     def request_refresh_action(self, params, context=None, request=None):
-        caller, source_id = api_utils.get_id_from_context(context,
-                                                          self.datasource_mgr)
+        caller, source_id = api_utils.get_id_from_context(context)
         try:
             args = {'source_id': source_id}
             # Note(thread-safety): blocking call
@@ -175,7 +151,7 @@ class DatasourceModel(base.APIModel):
             args = {'service_name': service, 'action': action,
                     'action_args': action_args}
             # Note(thread-safety): blocking call
-            self.invoke_rpc(self.engine, 'execute_action', args)
+            self.invoke_rpc('engine', 'execute_action', args)
         except exception.PolicyException as e:
             (num, desc) = error_codes.get('execute_error')
             raise webservice.DataModelException(num, desc + "::" + str(e))

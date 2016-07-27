@@ -21,15 +21,9 @@ from __future__ import absolute_import
 class APIModel(object):
     """Base Class for handling API requests."""
 
-    def __init__(self, name, keys='', inbox=None, dataPath=None,
-                 policy_engine=None, datasource_mgr=None, bus=None):
-        self.dist_arch = True
-        self.engine = policy_engine
-        if self.dist_arch:
-            self.engine = 'engine'
-        self.datasource_mgr = datasource_mgr
-        self.bus = bus
+    def __init__(self, name, bus=None):
         self.name = name
+        self.bus = bus
 
     # Note(thread-safety): blocking function
     def invoke_rpc(self, caller, name, kwargs):
