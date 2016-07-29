@@ -100,8 +100,8 @@ class DatasourceModel(base.APIModel):
                 # Note(thread-safety): blocking call
                 obj = self.bus.add_datasource(item=item)
                 # Note(thread-safety): blocking call
-                utils.create_datasource_policy(self.bus, obj['name'],
-                                               self.engine)
+                #utils.create_datasource_policy(self.bus, obj['name'],
+                #                               self.engine)
             else:
                 # Note(thread-safety): blocking call
                 obj = self.datasource_mgr.add_datasource(item=item)

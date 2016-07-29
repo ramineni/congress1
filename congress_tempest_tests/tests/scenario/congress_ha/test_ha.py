@@ -118,41 +118,43 @@ class TestHA(manager_congress.ScenarioPolicyBase):
             auth_prov, client_type,
             CONF.identity.region)
 
-    def datasource_exists(self, client, datasource_id):
+    def _check_resource_missing(self, client, method, args):
         try:
-            LOG.debug("datasource_exists begin")
-            body = client.list_datasource_status(datasource_id)
-            LOG.debug("list_datasource_status: %s", str(body))
+            LOG.debug("checking data using method %s", method)
+            func = getattr(client, method)
+            body = func(args)
+            LOG.debug("Function returned data: %s", str(body))
         except exceptions.NotFound:
             LOG.debug("not found")
-            return False
+            return True 
         except exceptions.Unauthorized:
             LOG.debug("connection refused")
             return False
         except (socket.error, MaxRetryError):
             LOG.debug("Replica server not ready")
             return False
-        except Exception as e:
-            raise e
-        return True
+        except Exception:
+            raise
+        return False 
 
-    def datasource_missing(self, client, datasource_id):
+    def _check_resource_exists(self, client, method, args):
         try:
-            LOG.debug("datasource_missing begin")
-            body = client.list_datasource_status(datasource_id)
-            LOG.debug("list_datasource_status: %s", str(body))
+            LOG.debug("checking data using method %s", method)
+            func = getattr(client, method)
+            body = func(args)
+            LOG.debug("Function returned data: %s", str(body))
         except exceptions.NotFound:
             LOG.debug("not found")
-            return True
+            return False 
         except exceptions.Unauthorized:
             LOG.debug("connection refused")
             return False
         except (socket.error, MaxRetryError):
             LOG.debug("Replica server not ready")
             return False
-        except Exception as e:
-            raise e
-        return False
+        except Exception:
+            raise
+        return True 
 
     def find_fake(self, client):
         datasources = client.list_datasources()
@@ -194,7 +196,8 @@ class TestHA(manager_congress.ScenarioPolicyBase):
 
         # Verify that primary server has no fake datasource
         if not test.call_until_true(
-                func=lambda: self.datasource_missing(client1, old_fake_id),
+                func=lambda: self._check_resource_missing(client1,
+                    'list_datasource_status', old_fake_id),
                 duration=60, sleep_for=1):
             raise exceptions.TimeoutException(
                 "primary should not have fake, but does")
@@ -207,7 +210,8 @@ class TestHA(manager_congress.ScenarioPolicyBase):
 
             # Verify that primary server has fake datasource
             if not test.call_until_true(
-                    func=lambda: self.datasource_exists(client1, fake_id),
+                    func=lambda: self._check_resource_exists(client1,
+                                            'list_datasource_status', fake_id),
                     duration=60, sleep_for=1):
                 raise exceptions.TimeoutException(
                     "primary should have fake, but does not")
@@ -220,10 +224,19 @@ class TestHA(manager_congress.ScenarioPolicyBase):
 
             # Verify that second server has fake datasource
             if not test.call_until_true(
-                    func=lambda: self.datasource_exists(client2, fake_id),
+                    func=lambda: self._check_resource_exists(client2,
+                                            'list_datasource_status', fake_id),
                     duration=60, sleep_for=1):
                 raise exceptions.TimeoutException(
                     "replica should have fake, but does not")
+
+            # Verify replica policy engine has syncronized fake policy
+            if not test.call_until_true(
+                    func=lambda: self._check_resource_exists(client2, 
+                                                     'show_policy', 'fake'),
+                    duration=60, sleep_for=1):
+                raise exceptions.TimeoutException(
+                    "replica should have fake policy, but does not")
 
             # Remove fake from primary server instance.
             LOG.debug("removing fake datasource %s", str(fake_id))
@@ -232,7 +245,8 @@ class TestHA(manager_congress.ScenarioPolicyBase):
 
             # Confirm that fake is gone from primary server instance.
             if not test.call_until_true(
-                    func=lambda: self.datasource_missing(client1, fake_id),
+                    func=lambda: self._check_resource_missing(client1, 
+                                            'list_datasource_status', fake_id),
                     duration=60, sleep_for=1):
                 self.stop_replica(CONF.congressha.replica_port)
                 raise exceptions.TimeoutException(
@@ -241,10 +255,19 @@ class TestHA(manager_congress.ScenarioPolicyBase):
 
             # Confirm that second service instance removes fake.
             if not test.call_until_true(
-                    func=lambda: self.datasource_missing(client2, fake_id),
+                    func=lambda: self._check_resource_missing(client2,
+                                            'list_datasource_status', fake_id),
                     duration=60, sleep_for=1):
                 raise exceptions.TimeoutException(
                     "replica should remove fake, but still has it")
+
+            # Confirm policy is removed from replica server.
+            if not test.call_until_true(
+                    func=lambda: self._check_resource_missing(client2,
+                                            'show_policy', fake_id),
+                    duration=60, sleep_for=1):
+                raise exceptions.TimeoutException(
+                    "replica should remove fake policy, but still has it")
 
         finally:
             self.stop_replica(CONF.congressha.replica_port)
