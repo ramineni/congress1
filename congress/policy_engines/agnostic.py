@@ -237,8 +237,6 @@ class Runtime (object):
         self.disabled_events = []
         # rules with errors (because of schema inconsistencies)
         self.error_events = []
-        # synchronizer
-        self.synchronizer = None
 
     ###############################################
     # Persistence layer
@@ -277,14 +275,6 @@ class Runtime (object):
                                        obj['owner_id'],
                                        obj['kind'])
 
-            # There is a chance that the synchronizer will run and delete
-            # policy_obj from the policy engine before the
-            # db_policy_rules.add_policy() adds the policy to the database.
-            # Call synchronize_policies() to ensure that the policy_engine has
-            # all the policies in the database.
-            if self.synchronizer:
-                # Note(thread-safety): blocking call
-                self.synchronizer.synchronize_policies()
         except Exception:
             policy_name = policy_obj.name
             msg = "Error thrown while adding policy %s into DB." % policy_name
@@ -2058,9 +2048,6 @@ class DseRuntime (Runtime, deepsix.deepSix):
             except exception.PolicyException as e:
                 LOG.error(str(e))
 
-    def set_synchronizer(self, synchronizer):
-        self.synchronizer = synchronizer
-
     def _rpc(self, service_name, action, args):
         return self.request(service_name, action, args=args)
 
@@ -2086,7 +2073,6 @@ class Dse2Runtime(DseRuntime):
         self.add_rpc_endpoint(Dse2RuntimeEndpoints(self))
         self.periodic_tasks = None
         self.sync_thread = None
-        self.synchronizer = self
 
     def start_policy_synchronizer(self):
         callables = [(self.synchronize, None, {})]
