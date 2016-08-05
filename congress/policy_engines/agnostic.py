@@ -2109,7 +2109,7 @@ class Dse2Runtime(DseRuntime):
             self.sync_thread = None
         super(Dse2Runtime, self).stop()
 
-    @periodics.periodic(spacing=(cfg.CONF.datasource_sync_period or 60),
+    @periodics.periodic(spacing=(cfg.CONF.datasource_sync_period or 30),
                         run_immediately=True)
     def synchronize(self):
         try:

@@ -169,6 +169,7 @@ class DseNode(object):
 
     # Note(thread-safety): blocking function
     def unregister_service(self, service_id):
+        LOG.debug("Unregistering %s service ", service_id)
         service = self.service_object(service_id)
         if not service:
             return
@@ -193,6 +194,8 @@ class DseNode(object):
         for node in peer_nodes.values():
             peer_services.extend(
                 [srv['service_id'] for srv in node['services']])
+        #all_services = set(local_services + peer_services)
+        #LOG.info("anu: all global services %s", all_services)
         return set(local_services + peer_services)
 
     def service_object(self, service_id):
@@ -542,7 +545,7 @@ class DseNode(object):
         if self._running:
             self.sync_thread = eventlet.spawn_n(self.periodic_tasks.start)
 
-    @periodics.periodic(spacing=(cfg.CONF.datasource_sync_period or 60))
+    @periodics.periodic(spacing=(cfg.CONF.datasource_sync_period or 30))
     def synchronize(self):
         try:
             self.synchronize_datasources()
@@ -759,6 +762,7 @@ class DseNode(object):
     # FIXME(thread-safety): make sure unregister_service succeeds even if
     #   service already unregistered
     def delete_datasource(self, datasource, update_db=True):
+        LOG.debug("deleting datasource %s", datasource['name'])
         datasource_id = datasource['id']
         session = db.get_session()
         with session.begin(subtransactions=True):
