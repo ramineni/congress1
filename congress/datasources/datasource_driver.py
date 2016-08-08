@@ -1284,7 +1284,7 @@ class PollingDataSourceDriver(DataSourceDriver):
             # Note(thread-safety): blocking call
             eventlet.greenthread.kill(self.worker_greenthread)
             self.worker_greenthread = None
-            self.log_info("killed worker thread")
+            LOG.info("killed %s polling worker thread", self.name)
 
     @utils.removed_in_dse2
     def cleanup(self):
