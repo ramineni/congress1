@@ -43,6 +43,13 @@ class TestHA(manager_congress.ScenarioPolicyBase):
         self.replicas = {}
         self.services_client = self.admin_manager.identity_services_client
         self.endpoints_client = self.admin_manager.endpoints_client
+        self.start_replica(CONF.congressha.replica_port)
+        self.client1 = self.admin_manager.congress_client
+        self.replica_client = self.create_client(CONF.congressha.replica_type)
+
+    def tearDown(self):
+        self.stop_replica(CONF.congressha.replica_port)
+        super(TestHA, self).tearDown()
 
     def _prepare_replica(self, port_num):
         replica_url = "http://127.0.0.1:%d" % port_num
@@ -97,7 +104,6 @@ class TestHA(manager_congress.ScenarioPolicyBase):
                                           dir='/tmp', delete=False)
         p = subprocess.Popen(args, stdout=out, stderr=err,
                              cwd=helper.root_path())
-
         assert port_num not in self.replicas
         self.replicas[port_num] = (p, conf_file)
 
@@ -118,31 +124,10 @@ class TestHA(manager_congress.ScenarioPolicyBase):
             auth_prov, client_type,
             CONF.identity.region)
 
-    def datasource_exists(self, client, datasource_id):
+    def _check_replica_server_status(self):
         try:
-            LOG.debug("datasource_exists begin")
-            body = client.list_datasource_status(datasource_id)
-            LOG.debug("list_datasource_status: %s", str(body))
-        except exceptions.NotFound:
-            LOG.debug("not found")
-            return False
-        except exceptions.Unauthorized:
-            LOG.debug("connection refused")
-            return False
-        except (socket.error, MaxRetryError):
-            LOG.debug("Replica server not ready")
-            return False
-        except Exception as e:
-            raise e
-        return True
-
-    def datasource_missing(self, client, datasource_id):
-        try:
-            LOG.debug("datasource_missing begin")
-            body = client.list_datasource_status(datasource_id)
-            LOG.debug("list_datasource_status: %s", str(body))
-        except exceptions.NotFound:
-            LOG.debug("not found")
+            LOG.debug("Check replica server status")
+            self.replica_client.list_policy()
             return True
         except exceptions.Unauthorized:
             LOG.debug("connection refused")
@@ -182,127 +167,52 @@ class TestHA(manager_congress.ScenarioPolicyBase):
         return ret['id']
 
     @test.attr(type='smoke')
-    def test_datasource_db_sync_add(self):
+    def test_datasource_db_sync_add_remove(self):
         # Verify that a replica adds a datasource when a datasource
         # appears in the database.
-        client1 = self.admin_manager.congress_client
 
         # delete fake if it exists.
-        old_fake_id = self.find_fake(client1)
+        old_fake_id = self.find_fake(self.client1)
         if old_fake_id:
-            client1.delete_datasource(old_fake_id)
+            self.client1.delete_datasource(old_fake_id)
 
         # Verify that primary server has no fake datasource
-        if not test.call_until_true(
-                func=lambda: self.datasource_missing(client1, old_fake_id),
-                duration=60, sleep_for=1):
-            raise exceptions.TimeoutException(
-                "primary should not have fake, but does")
+        self.assertIsNone(self.find_fake(self.client1),
+                          "primary should not have fake, but does")
 
         need_to_delete_fake = False
         try:
             # Create a new fake datasource
-            fake_id = self.create_fake(client1)
+            fake_id = self.create_fake(self.client1)
             need_to_delete_fake = True
 
             # Verify that primary server has fake datasource
+            self.assertIsNotNone(self.find_fake(self.client1),
+                                 "primary should have fake, but does not")
+
+            # Check replica server status
             if not test.call_until_true(
-                    func=lambda: self.datasource_exists(client1, fake_id),
+                func=lambda: self._check_replica_server_status(),
                     duration=60, sleep_for=1):
-                raise exceptions.TimeoutException(
-                    "primary should have fake, but does not")
+                raise exceptions.TimeoutException("Replica Server not ready")
 
-            # start replica
-            self.start_replica(CONF.congressha.replica_port)
-
-            # Create session for second server.
-            client2 = self.create_client(CONF.congressha.replica_type)
-
-            # Verify that second server has fake datasource
-            if not test.call_until_true(
-                    func=lambda: self.datasource_exists(client2, fake_id),
-                    duration=60, sleep_for=1):
-                raise exceptions.TimeoutException(
-                    "replica should have fake, but does not")
+            self.assertIsNotNone(self.find_fake(self.replica_client),
+                                 "replica should have fake, but does not")
 
             # Remove fake from primary server instance.
             LOG.debug("removing fake datasource %s", str(fake_id))
-            client1.delete_datasource(fake_id)
+            self.client1.delete_datasource(fake_id)
             need_to_delete_fake = False
 
             # Confirm that fake is gone from primary server instance.
-            if not test.call_until_true(
-                    func=lambda: self.datasource_missing(client1, fake_id),
-                    duration=60, sleep_for=1):
-                self.stop_replica(CONF.congressha.replica_port)
-                raise exceptions.TimeoutException(
-                    "primary instance still has fake")
+            self.assertIsNone(self.find_fake(self.client1),
+                              "primary instance still has fake")
             LOG.debug("removed fake datasource from primary instance")
 
             # Confirm that second service instance removes fake.
-            if not test.call_until_true(
-                    func=lambda: self.datasource_missing(client2, fake_id),
-                    duration=60, sleep_for=1):
-                raise exceptions.TimeoutException(
-                    "replica should remove fake, but still has it")
+            self.assertIsNone(self.find_fake(self.replica_client),
+                              "replica instance still has fake")
 
         finally:
-            self.stop_replica(CONF.congressha.replica_port)
             if need_to_delete_fake:
                 self.admin_manager.congress_client.delete_datasource(fake_id)
-
-    # The following test is redundant because removal by db sync is already
-    # tested in test_datasource_db_sync_add above
-    # TODO(ekcs): decide whether to completely erase or update test
-    # @test.attr(type='smoke')
-    # def test_datasource_db_sync_remove(self):
-    #     # Verify that a replica removes a datasource when a datasource
-    #     # disappears from the database.
-    #     client1 = self.admin_manager.congress_client
-    #     fake_id = self.create_fake(client1)
-    #     need_to_delete_fake = True
-    #     try:
-    #         self.start_replica(CONF.congressha.replica_port)
-    #
-    #         # Verify that primary server has fake datasource
-    #         if not test.call_until_true(
-    #                 func=lambda: self.datasource_exists(client1, fake_id),
-    #                 duration=60, sleep_for=1):
-    #             raise exceptions.TimeoutException(
-    #                 "primary should have fake, but does not")
-    #
-    #         # Create session for second server.
-    #         client2 = self.create_client(CONF.congressha.replica_type)
-    #
-    #         # Verify that second server has fake datasource
-    #         if not test.call_until_true(
-    #                 func=lambda: self.datasource_exists(client2, fake_id),
-    #                 duration=60, sleep_for=1):
-    #             raise exceptions.TimeoutException(
-    #                 "replica should have fake, but does not")
-    #
-    #         # Remove fake from primary server instance.
-    #         LOG.debug("removing fake datasource %s", str(fake_id))
-    #         client1.delete_datasource(fake_id)
-    #         need_to_delete_fake = False
-    #
-    #         # Confirm that fake is gone from primary server instance.
-    #         if not test.call_until_true(
-    #                 func=lambda: self.datasource_missing(client1, fake_id),
-    #                 duration=60, sleep_for=1):
-    #             self.stop_replica(CONF.congressha.replica_port)
-    #             raise exceptions.TimeoutException(
-    #                 "primary instance still has fake")
-    #         LOG.debug("removed fake datasource from primary instance")
-    #
-    #         # Confirm that second service instance removes fake.
-    #         if not test.call_until_true(
-    #                 func=lambda: self.datasource_missing(client2, fake_id),
-    #                 duration=60, sleep_for=1):
-    #             raise exceptions.TimeoutException(
-    #                 "replica should remove fake, but still has it")
-    #
-    #     finally:
-    #         self.stop_replica(CONF.congressha.replica_port)
-    #         if need_to_delete_fake:
-    #             self.admin_manager.congress_client.delete_datasource(fake_id)
