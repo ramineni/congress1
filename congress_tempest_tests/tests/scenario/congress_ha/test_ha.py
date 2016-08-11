@@ -92,23 +92,34 @@ class TestHA(manager_congress.ScenarioPolicyBase):
         f.write(conf)
         f.close()
 
-        args = ['/usr/bin/python',
-                'bin/congress-server',
-                '--config-file',
-                conf_file]
+        api_args = ['/usr/bin/python', 'bin/congress-server', '--api',
+                    '--policy_engine', '--node_id=replica-api-pe-node',
+                    '--config-file', conf_file]
+        data_args = ['/usr/bin/python', 'bin/congress-server', '--datasources',
+                     '--node_id=replica-data-node', '--config-file', conf_file]
+
         out = tempfile.NamedTemporaryFile(mode='w', suffix='.out',
-                                          prefix='congress%d-' % port_num,
+                                          prefix='congress-pe%d-' % port_num,
                                           dir='/tmp', delete=False)
         err = tempfile.NamedTemporaryFile(mode='w', suffix='.err',
-                                          prefix='congress%d-' % port_num,
+                                          prefix='congress-pe%d-' % port_num,
                                           dir='/tmp', delete=False)
-        p = subprocess.Popen(args, stdout=out, stderr=err,
-                             cwd=helper.root_path())
+        data_out = tempfile.NamedTemporaryFile(mode='w', suffix='.out',
+                                          prefix='congress-data%d-' % port_num,
+                                          dir='/tmp', delete=False)
+        data_err = tempfile.NamedTemporaryFile(mode='w', suffix='.err',
+                                          prefix='congress-data%d-' % port_num,
+                                          dir='/tmp', delete=False)
+        api-pe-process = subprocess.Popen(api_args, stdout=out, stderr=err,
+                                          cwd=helper.root_path())
+        data-process = subprocess.Popen(data_args, stdout=data_out,
+                                        stderr=data_err,
+                                        cwd=helper.root_path())
         assert port_num not in self.replicas
-        self.replicas[port_num] = (p, conf_file)
+        self.replicas[port_num] = (api-pe-process, data-process, conf_file)
 
     def stop_replica(self, port_num):
-        proc, conf_file = self.replicas[port_num]
+        api-proc, d-proc, conf_file = self.replicas[port_num]
         # Using proc.terminate() will block at proc.wait(), no idea why yet
         proc.kill()
         proc.wait()
