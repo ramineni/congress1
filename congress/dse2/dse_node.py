@@ -104,6 +104,7 @@ class DseNode(object):
 
         self.messaging_config = messaging_config
         self.node_id = node_id
+        self.node_type = []
         self.node_rpc_endpoints = node_rpc_endpoints
         # unique identifier shared by all nodes that can communicate
         self.partition_id = partition_id or cfg.CONF.bus_id or "bus"

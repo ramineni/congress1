@@ -288,6 +288,7 @@ def create2(node, policy_engine=True, datasources=True, api=True):
         LOG.info("Registering congress API service on node %s", node.node_id)
         services['api'], services['api_service'] = create_api()
         node.register_service(services['api_service'])
+        node.node_type.append('api')
 
     if policy_engine:
         LOG.info("Registering congress PolicyEngine service on node %s",
@@ -295,11 +296,13 @@ def create2(node, policy_engine=True, datasources=True, api=True):
         services[ENGINE_SERVICE_NAME] = create_policy_engine()
         node.register_service(services[ENGINE_SERVICE_NAME])
         initialize_policy_engine(services[ENGINE_SERVICE_NAME])
+        node.node_type.append('policy_engine')
 
     if datasources:
         LOG.info("Registering congress datasource services on node %s",
                  node.node_id)
         services['datasources'] = create_datasources(node)
+        node.node_type.append('datasource_node')
 
         # datasource policies would be created by respective PE's synchronizer
         # for ds in services['datasources']:
