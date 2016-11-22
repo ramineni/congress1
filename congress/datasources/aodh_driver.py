@@ -31,6 +31,21 @@ class AodhDriver(datasource_driver.PollingDataSourceDriver,
 
     value_trans = {'translation-type': 'VALUE'}
 
+    alarm_threshold_rule_translator = {
+        'translation-type': 'HDICT',
+        'table-name': ALARM_THRESHOLD_RULE,
+        'selector-type': 'DICT_SELECTOR',
+        'parent-key': 'alarm_id',
+        'parent-col-name': 'alarm_id',
+        'field-translators':
+            ({'fieldname': 'meter_name', 'translator': value_trans},
+             {'fieldname': 'evaluation_periods', 'translator': value_trans},
+             {'fieldname': 'statistic', 'translator': value_trans},
+             {'fieldname': 'period', 'translator': value_trans},
+             {'fieldname': 'comparison_operator', 'translator': value_trans},
+             {'fieldname': 'threshold', 'translator': value_trans},
+             )}
+
     alarms_translator = {
         'translation-type': 'HDICT',
         'table-name': ALARMS,
@@ -39,13 +54,11 @@ class AodhDriver(datasource_driver.PollingDataSourceDriver,
             ({'fieldname': 'alarm_id', 'translator': value_trans},
              {'fieldname': 'name', 'translator': value_trans},
              {'fieldname': 'state', 'translator': value_trans},
+             {'fieldname': 'severity', 'translator': value_trans},
              {'fieldname': 'enabled', 'translator': value_trans},
-             {'fieldname': 'threshold_rule', 'col': 'threshold_rule_id',
-              'translator': {'translation-type': 'VDICT',
-                             'table-name': ALARM_THRESHOLD_RULE,
-                             'id-col': 'threshold_rule_id',
-                             'key-col': 'key', 'val-col': 'value',
-                             'translator': value_trans}},
+             {'fieldname': 'threshold_rule',
+              'translator': alarm_threshold_rule_translator},
+             {'fieldname': 'combination_rule', 'translator': value_trans},
              {'fieldname': 'type', 'translator': value_trans},
              {'fieldname': 'description', 'translator': value_trans},
              {'fieldname': 'time_constraints', 'translator': value_trans},
@@ -59,6 +72,9 @@ class AodhDriver(datasource_driver.PollingDataSourceDriver,
              {'fieldname': 'timestamp', 'translator': value_trans},
              {'fieldname': 'state_timestamp', 'translator': value_trans},
              )}
+
+
+       
 
     def safe_id(x):
         if isinstance(x, six.string_types):
