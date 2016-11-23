@@ -227,7 +227,7 @@ class APILocalRouting(BaseTestPolicyCongress):
 
     def test_internode_pe_routing(self):
         '''test reach internode PE when intranode PE not available'''
-        self.node.unregister_service(api_base.ENGINE_SERVICE_ID)
+        self.node2.unregister_service(api_base.ENGINE_SERVICE_ID)
         result = self.api['api-row'].get_items(
             {}, {'policy_id': 'policy', 'table_id': 'p'})
         self.assertEqual(len(result['results']), 2)
