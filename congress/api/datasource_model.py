@@ -25,7 +25,6 @@ from congress.api import api_utils
 from congress.api import base
 from congress.api import error_codes
 from congress.api import webservice
-from congress.dse2 import dse_node
 from congress import exception
 
 LOG = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ class DatasourceModel(base.APIModel):
         obj = None
         try:
             # Note(thread-safety): blocking call
-            obj = self.invoke_rpc(dse_node.DS_MANAGER_SERVICE_ID,
+            obj = self.invoke_rpc(base.DS_MANAGER_SERVICE_ID,
                                   'add_datasource',
                                   {'items': item},
                                   timeout=self.dse_long_timeout)
@@ -104,7 +103,7 @@ class DatasourceModel(base.APIModel):
             #  delete a different datasource
             #  Fix: check UUID of datasource before operating.
             #  Abort if mismatch
-            self.invoke_rpc(dse_node.DS_MANAGER_SERVICE_ID,
+            self.invoke_rpc(base.DS_MANAGER_SERVICE_ID,
                             'delete_datasource',
                             {'datasource': datasource},
                             timeout=self.dse_long_timeout)
