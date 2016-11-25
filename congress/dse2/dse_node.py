@@ -38,6 +38,7 @@ from congress.db import datasources as datasources_db
 from congress.dse2 import control_bus
 from congress.dse2 import data_service
 from congress import exception
+from congress.synchronizer import datasource_synchronizer
 
 
 LOG = logging.getLogger(__name__)
@@ -147,6 +148,7 @@ class DseNode(object):
         self.loaded_drivers = self.load_drivers()
         self.periodic_tasks = None
         self.sync_thread = None
+        self.synchronizer = None
         self.start()
 
     def __del__(self):
@@ -590,98 +592,6 @@ class DseNode(object):
             results.append(result)
         return results
 
-    # TODO(ekcs): should we start and stop these along with self.{start, stop}?
-    def start_periodic_tasks(self):
-        callables = [(self.synchronize, None, {}),
-                     (self._check_resub_all, None, {})]
-        self.periodic_tasks = periodics.PeriodicWorker(callables)
-        if self._running:
-            self.sync_thread = eventlet.spawn_n(self.periodic_tasks.start)
-
-    def stop_datasource_synchronizer(self):
-        if self.periodic_tasks:
-            self.periodic_tasks.stop()
-            self.periodic_tasks.wait()
-            self.periodic_tasks = None
-        if self.sync_thread:
-            eventlet.greenthread.kill(self.sync_thread)
-            self.sync_thread = None
-
-    @periodics.periodic(spacing=cfg.CONF.datasource_sync_period)
-    def synchronize(self):
-        try:
-            self.synchronize_datasources()
-        except Exception:
-            LOG.exception("synchronize_datasources failed")
-
-    @lockutils.synchronized('congress_synchronize_datasources')
-    def synchronize_datasources(self):
-        if not cfg.CONF.datasources:
-            LOG.debug("Skipping datasource synchronization on a "
-                      "non-datasources node")
-            return
-        LOG.info("Synchronizing running datasources")
-        added = 0
-        removed = 0
-        datasources = self.get_datasources(filter_secret=False)
-        db_datasources = []
-        # Look for datasources in the db, but not in the services.
-        for configured_ds in datasources:
-            db_datasources.append(configured_ds['id'])
-            active_ds = self.service_object(uuid_=configured_ds['id'])
-            # If datasource is not enabled, unregister the service
-            if not configured_ds['enabled']:
-                if active_ds:
-                    LOG.debug("unregistering %s service, datasource disabled "
-                              "in DB.", active_ds.service_id)
-                    self.unregister_service(active_ds.service_id)
-                    removed = removed + 1
-                continue
-            if active_ds is None:
-                # service is not up, create the service
-                LOG.info("registering %s service on node %s",
-                         configured_ds['name'], self.node_id)
-                service = self.create_datasource_service(configured_ds)
-                self.register_service(service)
-                added = added + 1
-
-        # Unregister the services which are not in DB
-        active_ds_services = [s for s in self._services
-                              if getattr(s, 'type', '') == 'datasource_driver']
-        db_datasources_set = set(db_datasources)
-        stale_services = [s for s in active_ds_services
-                          if s.ds_id not in db_datasources_set]
-        for s in stale_services:
-            LOG.debug("unregistering %s service, datasource not found in DB ",
-                      s.service_id)
-            self.unregister_service(uuid_=s.ds_id)
-            removed = removed + 1
-
-        LOG.info("synchronize_datasources, added %d removed %d on node %s",
-                 added, removed, self.node_id)
-
-        # This might be required once we support update datasource config
-
-        # if not self._config_eq(configured_ds, active_ds):
-        #    LOG.debug('configured and active disagree: %s %s',
-        #              strutils.mask_password(active_ds),
-        #              strutils.mask_password(configured_ds))
-
-        #    LOG.info('Reloading datasource: %s',
-        #             strutils.mask_password(configured_ds))
-        #    self.delete_datasource(configured_ds['name'],
-        #                           update_db=False)
-        #    self.add_datasource(configured_ds, update_db=False)
-
-    # def _config_eq(self, db_config, active_config):
-    #     return (db_config['name'] == active_config.service_id and
-    #             db_config['config'] == active_config.service_info['args'])
-
-    @periodics.periodic(spacing=cfg.CONF.dse.time_to_resub)
-    def _check_resub_all(self):
-        for s in self._services:
-            s.check_resub_all()
-
     def delete_missing_driver_datasources(self):
         removed = 0
         for datasource in datasources_db.get_datasources():
@@ -749,7 +659,7 @@ class DseNode(object):
 
         new_id = datasource['id']
         try:
-            self.synchronize_datasources()
+            self.synchronizer.sync_datasource(req['name'])
             # immediate synch policies on local PE if present
             # otherwise wait for regularly scheduled synch
             engine = self.service_object(api_base.ENGINE_SERVICE_ID)
@@ -859,7 +769,7 @@ class DseNode(object):
 
         # Note(thread-safety): blocking call
         try:
-            self.synchronize_datasources()
+            self.synchronizer.sync_datasource(datasource['name'])
             # If local PE exists.. sync
             engine = self.service_object(api_base.ENGINE_SERVICE_ID)
             if engine:
@@ -903,6 +813,9 @@ class DseNodeEndpoints (object):
                 publisher=publisher, table=table, data=data, seqnum=seqnum,
                 is_snapshot=is_snapshot)
 
+    def set_synchronizer(self, synchronizer):
+        self.synchronizer = synchronizer
+
 
 DS_MANAGER_SERVICE_ID = '_ds_manager'
 
@@ -912,6 +825,21 @@ class DSManagerService(data_service.DataService):
     def __init__(self, service_id):
         super(DSManagerService, self).__init__(DS_MANAGER_SERVICE_ID)
         self.add_rpc_endpoint(DSManagerEndpoints(self))
+
+    def register_synchronizer(self):
+        self.synchronizer = datasource_synchronizer.DatasourceSynchronizer(self.node)
+        # registering synchronizer on node
+        self.node.set_synchronizer(self.synchronizer)
+        self.synchronizer.start()
+
+    def start(self):
+        super(DSManagerService, self).start()
+        self.register_synchronizer()
+
+    def stop(self):
+        if self.synchronizer:
+            self.synchronizer.stop()
+        super(DSManagerService, self).stop()
 
 
 class DSManagerEndpoints(object):
