@@ -62,3 +62,18 @@ class StatusModel(base.APIModel):
                 http_status_code=exception.NotFound.code)
 
         return status
+
+    def get_items(self, params, context=None):
+        """List all the active services running on this node."""
+        try:
+            services = self.bus.get_service_list()
+            LOG.info("anu:service list %s", services)
+        except Exception:
+            raise
+        s_list = [{'service_id': s['service_id'], 'node_id': s['node_id']}
+                  for s in services]
+        LOG.info("anu:service list %s", s_list)
+        return {'results': s_list}
+
+
+

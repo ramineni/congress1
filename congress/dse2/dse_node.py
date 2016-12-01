@@ -199,6 +199,7 @@ class DseNode(object):
 
     def get_services(self, hidden=False):
         """Return all local service objects."""
+        self.get_node_services()
         if hidden:
             return self._services
         return [s for s in self._services if s.service_id[0] != '_']
@@ -206,6 +207,7 @@ class DseNode(object):
     def get_global_service_names(self, hidden=False):
         """Return names of all services on all nodes."""
         services = self.get_services(hidden=hidden)
+        #local_services = {s.service_id:self.node_id for s in services}
         local_services = [s.service_id for s in services]
         # Also, check services registered on other nodes
         peer_nodes = self.dse_status()['peers']
@@ -214,6 +216,19 @@ class DseNode(object):
             peer_services.extend(
                 [srv['service_id'] for srv in node['services']])
         return set(local_services + peer_services)
+
+    def get_node_services(self):
+        services = self._services 
+        services_info = []
+        local_services = [{'service_id': s.service_id, 'node_id': self.node_id}
+                          for s in services]
+        services_info.extend(local_services)
+        peer_nodes = self.dse_status()['peers']
+        for node in peer_nodes.values():
+            services_info.extend(node['services'])
+
+        return services_info
+        
 
     def service_object(self, service_id=None, uuid_=None):
         """Return the service object requested.

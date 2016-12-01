@@ -80,17 +80,17 @@ def create2(node_id=None, bus_id=None, existing_node=None,
         services['api'], services['api_service'] = create_api()
         node.register_service(services['api_service'])
 
+    if datasources:
+        LOG.info("Registering congress datasource services on node %s",
+                 node.node_id)
+        services['datasources'] = create_datasources(node)
+
     if policy_engine:
         LOG.info("Registering congress PolicyEngine service on node %s",
                  node.node_id)
         services[api_base.ENGINE_SERVICE_ID] = create_policy_engine()
         node.register_service(services[api_base.ENGINE_SERVICE_ID])
         initialize_policy_engine(services[api_base.ENGINE_SERVICE_ID])
-
-    if datasources:
-        LOG.info("Registering congress datasource services on node %s",
-                 node.node_id)
-        services['datasources'] = create_datasources(node)
 
         # datasource policies would be created by respective PE's synchronizer
         # for ds in services['datasources']:

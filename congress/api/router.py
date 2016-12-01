@@ -108,6 +108,11 @@ class APIRouterV1(object):
             statuses)
         resource_mgr.register_handler(rule_status_element_handler)
 
+        service_status_path =  r'/v1/services/status'
+        ds_collection_handler = webservice.CollectionHandler(
+            service_status_path, statuses)
+
+        resource_mgr.register_handler(ds_collection_handler)
         tables = process_dict['api-table']
         tables_path = "(%s|%s)/tables" % (ds_path, policy_path)
         table_collection_handler = webservice.CollectionHandler(

@@ -200,6 +200,9 @@ class DataService(object):
     def is_valid_service(self, service_id):
         return self.node.is_valid_service(service_id)
 
+    def get_service_list(self):
+        return self.node.get_node_services()
+    
     # Will be removed once the reference of node exists in api
     # Note(thread-safety): blocking function
     def get_datasource(self, datasource_id):
