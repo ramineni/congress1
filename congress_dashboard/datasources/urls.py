@@ -18,17 +18,23 @@ from django.conf.urls import url
 from congress_dashboard.datasources import views
 
 
+#SERVICES = (
+#    r'^services/(?P<datasource_id>[^/]+)/(?P<service_table_name>[^/]+)/%s$')
 SERVICES = (
-    r'^services/(?P<datasource_id>[^/]+)/(?P<service_table_name>[^/]+)/%s$')
+    r'^(?P<datasource_id>[^/]+)/detail/(?P<service_table_name>[^/]+)/%s$')
 POLICIES = (
     r'^policies/(?P<datasource_id>[^/]+)/(?P<policy_table_name>[^/]+)/%s$')
 
+DATASOURCE = r'^(?P<datasource_id>[^/]+)/%s$'
 
 urlpatterns = patterns(
     '',
     url(r'^$', views.IndexView.as_view(), name='index'),
     url(SERVICES % 'detail', views.DetailView.as_view(),
         name='datasource_table_detail'),
+    url(DATASOURCE % 'detail', views.DatasourceView.as_view(),
+        name='datasource_detail'),
     url(POLICIES % 'detail', views.DetailView.as_view(),
         name='policy_table_detail'),
+
 )

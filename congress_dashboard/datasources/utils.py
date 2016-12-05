@@ -80,6 +80,14 @@ def _get_service_tables(request):
                       service_id, str(e))
     return all_tables
 
+def _get_service_tables1(request, datasource_name):
+    service_tables = congress.datasource_tables_list(request, datasource_name)
+    # Get the names of the tables.
+    datasource_tables = []
+    for table in service_tables:
+        table.set_id_as_name_if_empty()
+        datasource_tables.append(table['name'])
+    return datasource_tables
 
 def get_datasource_tables(request):
     """Get names of all data source tables.
@@ -101,7 +109,7 @@ def get_datasource_tables(request):
     tables.extend(_get_service_tables(request))
     return tables
 
-
+#def get_datasource_columns(request)
 def get_datasource_columns(request):
     """Get of names of columns from all data sources.
 

@@ -22,18 +22,19 @@ def get_resource_url(obj):
     return reverse('horizon:admin:datasources:datasource_table_detail',
                    args=(obj['datasource_id'], obj['table_id']))
 
+def get_datasource_url(obj):
+    return reverse('horizon:admin:datasources:datasource_detail')
+#                   args=(obj['name']))
 
 class DataSourcesTablesTable(tables.DataTable):
-    name = tables.Column("name", verbose_name=_("Table Name"),
-                         link=get_resource_url)
-    datasource_name = tables.Column("datasource_name",
-                                    verbose_name=_("Service"))
-    datasource_driver = tables.Column("datasource_driver",
-                                      verbose_name=_("Driver"))
+    name = tables.Column("id", verbose_name=_("Table Name"),
+                         link='horizon:admin:datasources:datasource_table_detail')
+#    name = tables.Column("id", verbose_name=_("Table Name"),
+#                         link=get_resource_url)
 
     class Meta(object):
         name = "datasources_tables"
-        verbose_name = _("Service Data")
+        verbose_name = _("Datasource Tables")
         hidden_title = False
 
 
@@ -68,22 +69,26 @@ class DataSourceRowsTable(tables.DataTable):
         hidden_title = False
 
 
-class DataSourceStatusesTable(tables.DataTable):
-    datasource_name = tables.Column("service",
-                                    verbose_name=_("Service"))
-    last_updated = tables.Column("last_updated",
-                                 verbose_name=_("Last Updated"))
-    subscriptions = tables.Column("subscriptions",
-                                  verbose_name=_("Subscriptions"),
-                                  wrap_list=True, filters=(unordered_list,))
-    last_error = tables.Column("last_error", verbose_name=_("Last Error"))
-    subscribers = tables.Column("subscribers", verbose_name=_("Subscribers"),
-                                wrap_list=True, filters=(unordered_list,))
-    initialized = tables.Column("initialized", verbose_name=_("Initialized"))
-    number_of_updates = tables.Column("number_of_updates",
-                                      verbose_name=_("Number of Updates"))
+class CreateDatasource(tables.LinkAction):
+    name = 'create_datasource'
+    verbose_name = _('Create Datasource')
+    #TODO(ramineni): change url to support datasource create
+    url = 'horizon:admin:policies:create'
+    classes = ('ajax-modal',)
+    icon = 'plus'
+
+#TODO(ramineni): support create/delete
+class DataSourcesTable(tables.DataTable):
+    name = tables.Column("name", verbose_name=_("Datasource Name"), 
+                         link=get_datasource_url)
+    enabled = tables.Column("enabled", verbose_name=_("Enabled"))
+    driver = tables.Column("driver", verbose_name=_("Driver"))
+    config = tables.Column("config", verbose_name=_("Config"))
 
     class Meta(object):
-        name = "service_status"
-        verbose_name = _("Service Status")
+        name = "datasources_list"
+        verbose_name = _("Configured DataSources")
         hidden_title = False
+        table_actions = (CreateDatasource,)
+        #row_actions = (Disable,)
+

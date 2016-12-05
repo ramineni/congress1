@@ -31,56 +31,19 @@ logger = logging.getLogger(__name__)
 
 class IndexView(tables.MultiTableView):
     """List service and policy defined data."""
-    table_classes = (datasources_tables.DataSourcesTablesTable,
-                     datasources_tables.PoliciesTablesTable,
-                     datasources_tables.DataSourceStatusesTable,)
+    table_classes = (datasources_tables.DataSourcesTable,
+                     datasources_tables.PoliciesTablesTable,)
     template_name = 'admin/datasources/index.html'
 
-    def get_datasources_tables_data(self):
+    def get_datasources_list_data(self):
         try:
             datasources = congress.datasources_list(self.request)
+            logger.info("anu: datasources list is %s", datasources)
+            return datasources
         except Exception as e:
             msg = _('Unable to get services list: %s') % str(e)
             messages.error(self.request, msg)
             return []
-
-        ds_temp = []
-        for ds in datasources:
-            ds_id = ds['id']
-            try:
-                ds_tables = congress.datasource_tables_list(self.request,
-                                                            ds_id)
-            except Exception as e:
-                msg_args = {'ds_id': ds_id, 'error': str(e)}
-                msg = _('Unable to get tables list for service "%(ds_id)s": '
-                        '%(error)s') % msg_args
-                messages.error(self.request, msg)
-                return []
-
-            for table in ds_tables:
-                table.set_value('datasource_id', ds_id)
-                table.set_value('datasource_name', ds['name'])
-                table.set_value('datasource_driver', ds['driver'])
-                table.set_id_as_name_if_empty()
-                # Object ids within a Horizon table must be unique. Otherwise,
-                # Horizon will cache the column values for the object by id and
-                # use the same column values for all rows with the same id.
-                table.set_value('table_id', table['id'])
-                table.set_value('id', '%s-%s' % (ds_id, table['table_id']))
-                ds_temp.append(table)
-
-        logger.debug("ds_temp %s" % ds_temp)
-        return ds_temp
-
-    def get_service_status_data(self):
-        ds = []
-        try:
-            ds = congress.datasource_statuses_list(self.request)
-            logger.debug("ds status : %s " % ds)
-        except Exception as e:
-            msg = _('Unable to get datasource status list: %s') % str(e)
-            messages.error(self.request, msg)
-        return ds
 
     def get_policies_tables_data(self):
         try:
@@ -115,6 +78,43 @@ class IndexView(tables.MultiTableView):
 
         return policies_tables
 
+class DatasourceView(tables.DataTableView):
+    template_name = 'admin/datasources/datasource_detail.html'
+    table_class = datasources_tables.DataSourcesTablesTable
+
+    def get_data(self):
+        ds_id = self.kwargs['datasource_id']
+        logger.info("anu:netred get_data %s", self.kwargs)
+        try:
+            ds_tables = congress.datasource_tables_list(self.request, ds_id)
+            logger.debug("anu:ds_temp %s" % ds_tables)
+            return ds_tables
+        except Exception as e:
+            msg_args = {'ds_id': ds_id, 'error': str(e)}
+            msg = _('Unable to get tables list for service "%(ds_id)s": '
+                    '%(error)s') % msg_args
+            messages.error(self.request, msg)
+            return []
+
+    def get_context_data(self, **kwargs):
+        context = super(DatasourceView, self).get_context_data(**kwargs)
+        datasource_id = self.kwargs['datasource_id']
+        try:
+            datasource = congress.datasource_get(self.request, datasource_id)
+            status = congress.datasource_status_list(self.request,
+                                                     datasource['name'])
+            context['last_updated'] = status['last_updated']
+            context['subscribers'] = status['subscribers']
+            context['subscriptions'] = status['subscriptions']
+            context['last_error'] = status['last_error']
+            context['number_of_updates'] = status['number_of_updates']
+            context['datasource_name'] = datasource['name']
+            context['status'] = ('Active' if status['initialized']
+                                 else 'Not Active')
+            return context
+        except Exception:
+            raise
+
 
 class DetailView(tables.DataTableView):
     """List details about and rows from a data source (service or policy)."""
@@ -122,6 +122,7 @@ class DetailView(tables.DataTableView):
     template_name = 'admin/datasources/detail.html'
 
     def get_data(self):
+        logger.info("anu: entered detailview")
         datasource_id = self.kwargs['datasource_id']
         table_name = self.kwargs.get('policy_table_name')
         is_service = False
@@ -250,6 +251,7 @@ class DetailView(tables.DataTableView):
         return rows
 
     def get_context_data(self, **kwargs):
+        logger.info("anu: entered detailcontext view")
         context = super(DetailView, self).get_context_data(**kwargs)
         if 'policy_table_name' in kwargs:
             table_name = kwargs.get('policy_table_name')
