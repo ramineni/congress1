@@ -13,7 +13,8 @@
 # under the License.
 
 from django.core.urlresolvers import reverse
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import ugettext_lazy as _                         
+from django.utils.translation import ungettext_lazy                             
 from horizon import tables
 
 
@@ -63,6 +64,36 @@ class DataSourceRowsTable(tables.DataTable):
         hidden_title = False
 
 
+class CreateDatasource(tables.LinkAction):
+    name = 'create_datasource'
+    verbose_name = _('Create Datasource')
+    url = 'horizon:admin:datasources:create'
+    classes = ('ajax-modal',)
+    icon = 'plus'
+
+class DeleteDatasource(tables.DeleteAction):
+    @staticmethod
+    def action_present(count):
+        return ungettext_lazy(
+            u"Delete Datasource",
+            u'Deleted Datasources',
+            count
+        )
+
+    @staticmethod
+    def action_past(count):
+        return ungettext_lazy(
+            u'Deleted Datasource',
+            u'Deleted Datasources',
+            count
+        )
+
+    redirect_url = 'horizon:admin:datasources:index'
+
+    def delete(self, request, name):
+        congress.delete_datasource(request, name)
+
+
 # TODO(ramineni): support create/delete datasource
 class DataSourcesTable(tables.DataTable):
     name = tables.Column("name", verbose_name=_("Datasource Name"),
@@ -75,5 +106,5 @@ class DataSourcesTable(tables.DataTable):
         name = "datasources_list"
         verbose_name = _("Configured DataSources")
         hidden_title = False
-        # table_actions = (CreateDatasource,)
-        # row_actions = (Disable,)
+        table_actions = (CreateDatasource, DeleteDatasource)
+        row_actions = (DeleteDatasource,)

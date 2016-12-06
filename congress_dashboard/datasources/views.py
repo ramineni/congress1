@@ -16,14 +16,17 @@ import copy
 import logging
 
 from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse_lazy
 from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext_lazy as _
 from horizon import exceptions
 from horizon import messages
 from horizon import tables
+from horizon import forms
 
 from congress_dashboard.api import congress
 from congress_dashboard.datasources import tables as datasources_tables
+from congress_dashboard.datasources import forms as datasource_forms
 
 
 logger = logging.getLogger(__name__)
@@ -129,6 +132,11 @@ class DatasourceView(tables.DataTableView):
             messages.error(self.request, msg)
             return []
 
+
+class CreateView(forms.ModalFormView):
+    form_class = datasource_forms.CreateDatasource
+    template_name = 'admin/datasources/create.html'
+    success_url = reverse_lazy('horizon:admin:datasources:index')
 
 class DetailView(tables.DataTableView):
     """List details about and rows from a data source (service or policy)."""

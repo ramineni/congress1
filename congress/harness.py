@@ -79,7 +79,7 @@ def create2(node_id=None, bus_id=None, existing_node=None,
         services['ds_manager'] = ds_manager.DSManagerService(
             api_base.DS_MANAGER_SERVICE_ID)
         node.register_service(services['ds_manager'])
-
+    
     if policy_engine:
         LOG.info("Registering congress PolicyEngine service on node %s",
                  node.node_id)
