@@ -223,21 +223,11 @@ def datasources_list(request):
     return [PolicyAPIDictWrapper(d) for d in datasources]
 
 
-def datasource_get(request, datasource_id):
+def datasource_get(request, name_or_id):
     """Get a data source by id."""
-    # TODO(jwy): Need API in congress_client to retrieve data source by id.
-    datasources = datasources_list(request)
-    for d in datasources:
-        if d['id'] == datasource_id:
-            return d
-
-
-def datasource_get_by_name(request, datasource_name):
-    """Get a data source by name."""
-    datasources = datasources_list(request)
-    for d in datasources:
-        if d['name'] == datasource_name:
-            return d
+    client = congressclient(request)
+    datasource = client.show_datasource(name_or_id)
+    return datasource
 
 
 def datasource_tables_list(request, datasource_id):
@@ -274,13 +264,6 @@ def datasource_table_schema_get(request, datasource_id, table_name):
     """Get the schema for a data source table."""
     client = congressclient(request)
     return client.show_datasource_table_schema(datasource_id, table_name)
-
-
-def datasource_table_schema_get_by_name(request, datasource_name, table_name):
-    """Get the schema for a data source table."""
-    datasource = datasource_get_by_name(request, datasource_name)
-    client = congressclient(request)
-    return client.show_datasource_table_schema(datasource['id'], table_name)
 
 
 def datasource_statuses_list(request):

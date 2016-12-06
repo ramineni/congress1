@@ -146,8 +146,8 @@ class DetailView(tables.DataTableView):
             else:
                 # Service data table.
                 is_service = True
-                datasource = congress.datasource_get_by_name(
-                    self.request, datasource_id)
+                datasource = congress.datasource_get(self.request,
+                                                     datasource_id)
                 table_name = self.kwargs['service_table_name']
                 rows = congress.datasource_rows_list(
                     self.request, datasource_id, table_name)

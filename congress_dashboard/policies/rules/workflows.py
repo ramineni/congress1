@@ -210,7 +210,7 @@ class CreateRule(workflows.Workflow):
         datasource = table_parts[0]
         table_name = table_parts[1]
         try:
-            schema = congress.datasource_table_schema_get_by_name(
+            schema = congress.datasource_table_schema_get(
                 request, datasource, table_name)
         except Exception:
             # Maybe it's a policy table, not a service.
