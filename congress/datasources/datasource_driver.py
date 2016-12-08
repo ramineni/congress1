@@ -1131,6 +1131,7 @@ class DataSourceDriver(data_service.DataService):
         d['initialized'] = str(self.initialized)
         d['subscriptions'] = self.subscription_list()
         d['subscribers'] = self.subscriber_list()
+        d['node_id'] = self.node.node_id
 
         return d
 
