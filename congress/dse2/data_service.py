@@ -192,38 +192,8 @@ class DataService(object):
         return self.node.invoke_service_rpc(
             service, action, kwargs, timeout=timeout, local=local, retry=retry)
 
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def get_datasources(self, filter_secret=False):
-        return self.node.get_datasources(filter_secret)
-
     def is_valid_service(self, service_id):
         return self.node.is_valid_service(service_id)
-
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def get_datasource(self, datasource_id):
-        return self.node.get_datasource(datasource_id)
-
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def get_drivers_info(self, *args):
-        return self.node.get_drivers_info(*args)
-
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def get_driver_info(self, *args):
-        return self.node.get_driver_info(*args)
-
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def get_driver_schema(self, *args):
-        return self.node.get_driver_schema(*args)
-
-    # Will be removed once the reference of node exists in api
-    # Note(thread-safety): blocking function
-    def make_datasource_dict(self, *args, **kwargs):
-        return self.node.make_datasource_dict(*args, **kwargs)
 
     # Note(thread-safety): blocking function
     def publish(self, table, data, use_snapshot=True):

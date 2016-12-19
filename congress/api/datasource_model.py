@@ -26,6 +26,7 @@ from congress.api import base
 from congress.api import error_codes
 from congress.api import webservice
 from congress.dse2 import dse_node
+from congress.dse2 import datasource_manager as ds_manager
 from congress import exception
 
 LOG = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class DatasourceModel(base.APIModel):
         """
 
         # Note(thread-safety): blocking call
-        results = self.bus.get_datasources(filter_secret=True)
+        results = ds_manager.DSManager.get_datasources(filter_secret=True)
 
         # Check that running datasources match the datasources in the
         # database since this is going to tell the client about those
@@ -96,7 +97,7 @@ class DatasourceModel(base.APIModel):
         ds_id = context.get('ds_id')
         try:
             # Note(thread-safety): blocking call
-            datasource = self.bus.get_datasource(ds_id)
+            datasource = ds_manager.DSManager.get_datasource(ds_id)
             # FIXME(thread-safety):
             #  by the time greenthread resumes, the
             #  returned datasource name could refer to a totally different

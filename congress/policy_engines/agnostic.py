@@ -35,6 +35,7 @@ from congress.datalog import unify
 from congress.datalog import utility
 from congress.db import db_policy_rules
 from congress.dse2 import data_service
+from congress.dse2.datasource_manager import DSManager
 from congress import exception
 from oslo_messaging import exceptions as messaging_exceptions
 import time
@@ -312,7 +313,7 @@ class Runtime (object):
                 added = added + 1
 
         # Synchronize datasource policies with datasources in DB
-        db_datasources = self.node.get_datasources()
+        db_datasources = DSManager.get_datasources()
         for p in db_datasources:
             ds_name = p['name']
             if ds_name not in datasource_policies:

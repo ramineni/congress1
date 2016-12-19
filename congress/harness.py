@@ -41,6 +41,7 @@ from congress.api.system import driver_model
 from congress.api import table_model
 from congress.db import datasources as db_datasources
 from congress.dse2 import dse_node
+from congress.dse2 import datasource_manager as ds_manager
 from congress import exception
 from congress.policy_engines import agnostic
 
@@ -104,8 +105,7 @@ def create2(node_id=None, bus_id=None, existing_node=None,
         services[api_base.ENGINE_SERVICE_ID].start_policy_synchronizer()
     if datasources:
         node.start_periodic_tasks()
-        node.register_service(
-            dse_node.DSManagerService(dse_node.DS_MANAGER_SERVICE_ID))
+        node.register_service(ds_manager.DSManager())
 
     if api:
         LOG.info("Registering congress API service on node %s", node.node_id)
@@ -160,14 +160,14 @@ def create_datasources(bus):
     """Create and register datasource services ."""
     if cfg.CONF.delete_missing_driver_datasources:
         # congress server started with --delete-missing-driver-datasources
-        bus.delete_missing_driver_datasources()
+        ds_manager.DSManager.delete_missing_driver_datasources()
 
     datasources = db_datasources.get_datasources()
     services = []
     for ds in datasources:
         LOG.info("create configured datasource service %s.", ds.name)
         try:
-            service = bus.create_datasource_service(ds)
+            service = ds_manager.DSManager.create_datasource_service(ds)
             if service:
                 bus.register_service(service)
                 services.append(service)

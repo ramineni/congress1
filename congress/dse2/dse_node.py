@@ -13,8 +13,6 @@
 #    under the License.
 #
 
-import json
-import six
 import uuid
 
 import eventlet
@@ -23,20 +21,13 @@ eventlet.monkey_patch()  # for using oslo.messaging w/ eventlet executor
 from futurist import periodics
 from oslo_concurrency import lockutils
 from oslo_config import cfg
-from oslo_db import exception as db_exc
 from oslo_log import log as logging
 import oslo_messaging as messaging
 from oslo_messaging import exceptions as messaging_exceptions
 from oslo_messaging.rpc import dispatcher
-from oslo_utils import importutils
-from oslo_utils import strutils
-from oslo_utils import uuidutils
 
-from congress.api import base as api_base
-from congress.datasources import constants
-from congress.db import datasources as datasources_db
 from congress.dse2 import control_bus
-from congress.dse2 import data_service
+from congress.dse2 import datasource_manager as ds_manager
 from congress import exception
 
 
@@ -143,10 +134,9 @@ class DseNode(object):
         # Note(ekcs): A little strange that _control_bus starts before self?
         self._control_bus = control_bus.DseNodeControlBus(self)
         self.register_service(self._control_bus)
-        # load configured drivers
-        self.loaded_drivers = self.load_drivers()
         self.periodic_tasks = None
         self.sync_thread = None
+        ds_manager.DSManager.load_drivers()
         self.start()
 
     def __del__(self):
@@ -527,69 +517,6 @@ class DseNode(object):
                     s.on_no_subs(removed)
             s._published_tables_with_subscriber = tables_with_subs
 
-    # Driver CRUD.  Maybe belongs in a subclass of DseNode?
-    # Note(thread-safety): blocking function?
-    def load_drivers(self):
-        """Load all configured drivers and check no name conflict"""
-        result = {}
-        for driver_path in cfg.CONF.drivers:
-            # Note(thread-safety): blocking call?
-            obj = importutils.import_class(driver_path)
-            driver = obj.get_datasource_info()
-            if driver['id'] in result:
-                raise exception.BadConfig(_("There is a driver loaded already"
-                                          "with the driver name of %s")
-                                          % driver['id'])
-            driver['module'] = driver_path
-            result[driver['id']] = driver
-        return result
-
-    def get_driver_info(self, driver):
-        driver = self.loaded_drivers.get(driver)
-        if not driver:
-            raise exception.DriverNotFound(id=driver)
-        return driver
-
-    def get_drivers_info(self):
-        return self.loaded_drivers
-
-    def get_driver_schema(self, drivername):
-        driver = self.get_driver_info(drivername)
-        # Note(thread-safety): blocking call?
-        obj = importutils.import_class(driver['module'])
-        return obj.get_schema()
-
-    # Datasource CRUD.  Maybe belongs in a subclass of DseNode?
-    # Note(thread-safety): blocking function
-    def get_datasource(cls, id_):
-        """Return the created datasource."""
-        # Note(thread-safety): blocking call
-        result = datasources_db.get_datasource(id_)
-        if not result:
-            raise exception.DatasourceNotFound(id=id_)
-        return cls.make_datasource_dict(result)
-
-    # Note(thread-safety): blocking function
-    def get_datasources(self, filter_secret=False):
-        """Return the created datasources as recorded in the DB.
-
-        This returns what datasources the database contains, not the
-        datasources that this server instance is running.
-        """
-        results = []
-        for datasource in datasources_db.get_datasources():
-            result = self.make_datasource_dict(datasource)
-            if filter_secret:
-                # driver_info knows which fields should be secret
-                driver_info = self.get_driver_info(result['driver'])
-                try:
-                    for hide_field in driver_info['secret']:
-                        result['config'][hide_field] = "<hidden>"
-                except KeyError:
-                    pass
-            results.append(result)
-        return results
-
     # TODO(ekcs): should we start and stop these along with self.{start, stop}?
     def start_periodic_tasks(self):
         callables = [(self.synchronize, None, {}),
@@ -623,7 +550,7 @@ class DseNode(object):
         LOG.info("Synchronizing running datasources")
         added = 0
         removed = 0
-        datasources = self.get_datasources(filter_secret=False)
+        datasources = ds_manager.DSManager.get_datasources(filter_secret=False)
         db_datasources = []
         # Look for datasources in the db, but not in the services.
         for configured_ds in datasources:
@@ -641,7 +568,8 @@ class DseNode(object):
                 # service is not up, create the service
                 LOG.info("registering %s service on node %s",
                          configured_ds['name'], self.node_id)
-                service = self.create_datasource_service(configured_ds)
+                service = ds_manager.DSManager.create_datasource_service(
+                            configured_ds)
                 self.register_service(service)
                 added = added + 1
 
@@ -682,191 +610,6 @@ class DseNode(object):
         for s in self._services:
             s.check_resub_all()
 
-    def delete_missing_driver_datasources(self):
-        removed = 0
-        for datasource in datasources_db.get_datasources():
-            try:
-                self.get_driver_info(datasource.driver)
-            except exception.DriverNotFound:
-                ds_dict = self.make_datasource_dict(datasource)
-                self.delete_datasource(ds_dict)
-                removed = removed+1
-                LOG.debug("Deleted datasource with config %s ",
-                          strutils.mask_password(ds_dict))
-
-        LOG.info("Datsource cleanup completed, removed %d datasources",
-                 removed)
-
-    def make_datasource_dict(self, req, fields=None):
-        result = {'id': req.get('id') or uuidutils.generate_uuid(),
-                  'name': req.get('name'),
-                  'driver': req.get('driver'),
-                  'description': req.get('description'),
-                  'type': None,
-                  'enabled': req.get('enabled', True)}
-        # NOTE(arosen): we store the config as a string in the db so
-        # here we serialize it back when returning it.
-        if isinstance(req.get('config'), six.string_types):
-            result['config'] = json.loads(req['config'])
-        else:
-            result['config'] = req.get('config')
-
-        return self._fields(result, fields)
-
-    def _fields(self, resource, fields):
-        if fields:
-            return dict(((key, item) for key, item in resource.items()
-                         if key in fields))
-        return resource
-
-    # Note(thread-safety): blocking function
-    def add_datasource(self, item, deleted=False, update_db=True):
-        req = self.make_datasource_dict(item)
-
-        # check the request has valid information
-        self.validate_create_datasource(req)
-        if (len(req['name']) == 0 or req['name'][0] == '_'):
-            raise exception.InvalidDatasourceName(value=req['name'])
-
-        new_id = req['id']
-        LOG.debug("adding datasource %s", req['name'])
-        if update_db:
-            LOG.debug("updating db")
-            try:
-                # Note(thread-safety): blocking call
-                datasource = datasources_db.add_datasource(
-                    id_=req['id'],
-                    name=req['name'],
-                    driver=req['driver'],
-                    config=req['config'],
-                    description=req['description'],
-                    enabled=req['enabled'])
-            except db_exc.DBDuplicateEntry:
-                raise exception.DatasourceNameInUse(value=req['name'])
-            except db_exc.DBError:
-                LOG.exception('Creating a new datasource failed.')
-                raise exception.DatasourceCreationError(value=req['name'])
-
-        new_id = datasource['id']
-        try:
-            self.synchronize_datasources()
-            # immediate synch policies on local PE if present
-            # otherwise wait for regularly scheduled synch
-            # TODO(dse2): use finer-grained method to synch specific policies
-            engine = self.service_object(api_base.ENGINE_SERVICE_ID)
-            if engine is not None:
-                engine.synchronize_policies()
-            # TODO(dse2): also broadcast to all PE nodes to synch
-        except exception.DataServiceError:
-            LOG.exception('the datasource service is already '
-                          'created in the node')
-        except Exception:
-            LOG.exception(
-                'Unexpected exception encountered while registering '
-                'new datasource %s.', req['name'])
-            if update_db:
-                datasources_db.delete_datasource(req['id'])
-            msg = ("Datasource service: %s creation fails." % req['name'])
-            raise exception.DatasourceCreationError(message=msg)
-
-        new_item = dict(item)
-        new_item['id'] = new_id
-        return self.make_datasource_dict(new_item)
-
-    def validate_create_datasource(self, req):
-        driver = req['driver']
-        config = req['config'] or {}
-        for loaded_driver in self.loaded_drivers.values():
-            if loaded_driver['id'] == driver:
-                specified_options = set(config.keys())
-                valid_options = set(loaded_driver['config'].keys())
-                # Check that all the specified options passed in are
-                # valid configuration options that the driver exposes.
-                invalid_options = specified_options - valid_options
-                if invalid_options:
-                    raise exception.InvalidDriverOption(
-                        invalid_options=invalid_options)
-
-                # check that all the required options are passed in
-                required_options = set(
-                    [k for k, v in loaded_driver['config'].items()
-                     if v == constants.REQUIRED])
-                missing_options = required_options - specified_options
-                if missing_options:
-                    missing_options = ', '.join(missing_options)
-                    raise exception.MissingRequiredConfigOptions(
-                        missing_options=missing_options)
-                return loaded_driver
-
-        # If we get here no datasource driver match was found.
-        raise exception.InvalidDriver(driver=req)
-
-    # Note (thread-safety): blocking function
-    def create_datasource_service(self, datasource):
-        """Create a new DataService on this node.
-
-        :param name is the name of the service.  Must be unique across all
-               services
-        :param classPath is a string giving the path to the class name, e.g.
-               congress.datasources.fake_datasource.FakeDataSource
-        :param args is the list of arguments to give the DataService
-               constructor
-        :param type_ is the kind of service
-        :param id_ is an optional parameter for specifying the uuid.
-        """
-        # get the driver info for the datasource
-        ds_dict = self.make_datasource_dict(datasource)
-        if not ds_dict['enabled']:
-            LOG.info("datasource %s not enabled, skip loading",
-                     ds_dict['name'])
-            return
-
-        driver_info = self.get_driver_info(ds_dict['driver'])
-        # split class_path into module and class name
-        class_path = driver_info['module']
-        pieces = class_path.split(".")
-        module_name = ".".join(pieces[:-1])
-        class_name = pieces[-1]
-
-        if ds_dict['config'] is None:
-            args = {'ds_id': ds_dict['id']}
-        else:
-            args = dict(ds_dict['config'], ds_id=ds_dict['id'])
-        kwargs = {'name': ds_dict['name'], 'args': args}
-        LOG.info("creating service %s with class %s and args %s",
-                 ds_dict['name'], module_name,
-                 strutils.mask_password(kwargs, "****"))
-
-        # import the module
-        try:
-            # Note(thread-safety): blocking call?
-            module = importutils.import_module(module_name)
-            service = getattr(module, class_name)(**kwargs)
-        except Exception:
-            msg = ("Error loading instance of module '%s'")
-            LOG.exception(msg, class_path)
-            raise exception.DataServiceError(msg % class_path)
-        return service
-
-    # Note(thread-safety): blocking function
-    def delete_datasource(self, datasource, update_db=True):
-        LOG.debug("Deleting %s datasource ", datasource['name'])
-        datasource_id = datasource['id']
-        if update_db:
-            # Note(thread-safety): blocking call
-            result = datasources_db.delete_datasource_with_data(datasource_id)
-            if not result:
-                raise exception.DatasourceNotFound(id=datasource_id)
-
-        # Note(thread-safety): blocking call
-        try:
-            self.synchronize_datasources()
-        except Exception:
-            msg = ('failed to synchronize_datasource after '
-                   'deleting datasource: %s' % datasource_id)
-            LOG.exception(msg)
-            raise exception.DataServiceError(msg)
-
 
 class DseNodeEndpoints (object):
     """Collection of RPC endpoints that the DseNode exposes on the bus.
@@ -899,25 +642,3 @@ class DseNodeEndpoints (object):
             self.node.service_object(s).receive_data_sequenced(
                 publisher=publisher, table=table, data=data, seqnum=seqnum,
                 is_snapshot=is_snapshot)
-
-
-DS_MANAGER_SERVICE_ID = '_ds_manager'
-
-
-class DSManagerService(data_service.DataService):
-    """A proxy service to datasource managing methods in dse_node."""
-    def __init__(self, service_id):
-        super(DSManagerService, self).__init__(DS_MANAGER_SERVICE_ID)
-        self.add_rpc_endpoint(DSManagerEndpoints(self))
-
-
-class DSManagerEndpoints(object):
-
-    def __init__(self, service):
-        self.service = service
-
-    def add_datasource(self, context, items):
-        return self.service.node.add_datasource(items)
-
-    def delete_datasource(self, context, datasource):
-        return self.service.node.delete_datasource(datasource)

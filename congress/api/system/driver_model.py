@@ -21,6 +21,7 @@ from congress.api import api_utils
 from congress.api import base
 from congress.api import webservice
 from congress import exception
+from congress.dse2 import datasource_manager as ds_manager
 
 
 def d6service(name, keys, inbox, datapath, args):
@@ -43,9 +44,9 @@ class DatasourceDriverModel(base.APIModel):
                  a list of items in the model.  Additional keys set in the
                  dict will also be rendered for the user.
         """
-        drivers = self.bus.get_drivers_info()
+        drivers = ds_manager.DSManager.get_drivers_info()
         fields = ['id', 'description']
-        results = [self.bus.make_datasource_dict(
+        results = [ds_manager.DSManager.make_datasource_dict(
                    drivers[driver], fields=fields)
                    for driver in drivers]
         return {"results": results}
@@ -64,8 +65,8 @@ class DatasourceDriverModel(base.APIModel):
         """
         datasource = context.get('driver_id')
         try:
-            driver = self.bus.get_driver_info(datasource)
-            schema = self.bus.get_driver_schema(datasource)
+            driver = ds_manager.DSManager.get_driver_info(datasource)
+            schema = ds_manager.DSManager.get_driver_schema(datasource)
         except exception.DriverNotFound as e:
             raise webservice.DataModelException(e.code, str(e),
                                                 http_status_code=e.code)
