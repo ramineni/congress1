@@ -45,18 +45,6 @@ core_opts = [
                help='Sets the value of TCP_KEEPIDLE in seconds for each '
                     'server socket. Only applies if tcp_keepalive is '
                     'true. Not supported on OS X.'),
-    cfg.StrOpt('policy_path',
-               help="The path to the latest policy dump",
-               deprecated_for_removal=True,
-               deprecated_reason='No longer used'),
-    cfg.StrOpt('datasource_file',
-               deprecated_for_removal=True,
-               help="The file containing datasource configuration"),
-    cfg.StrOpt('root_path',
-               deprecated_for_removal=True,
-               deprecated_reason='automatically calculated its path in '
-                                 'initializing steps.',
-               help="The absolute path to the congress repo"),
     cfg.IntOpt('api_workers', default=1,
                help='The number of worker processes to serve the congress '
                     'API application.'),
@@ -67,17 +55,12 @@ core_opts = [
     cfg.ListOpt('drivers',
                 default=[],
                 help=_('List of driver class paths to import.')),
-    cfg.IntOpt('datasource_sync_period', default=60,
+    cfg.IntOpt('sync_interval', default=60,
                help='The number of seconds to wait between synchronizing '
-                    'datasource config from the database'),
+                    'datasource/policies config from the database'),
     cfg.BoolOpt('enable_execute_action', default=True,
                 help='Set the flag to False if you don\'t want Congress '
                      'to execute actions.'),
-    cfg.BoolOpt('distributed_architecture',
-                deprecated_for_removal=True,
-                deprecated_reason='distributed architecture is now the only '
-                                  'supported configuration.',
-                help="Set the flag to use congress distributed architecture."),
 ]
 
 # Register the configuration options

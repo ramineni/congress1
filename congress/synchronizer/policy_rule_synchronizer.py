@@ -149,7 +149,7 @@ class PolicyRuleSynchronizer(object):
                 owner=p['owner_id'])
             LOG.debug("synchronizer, policy replaced %s", name)
 
-    @periodics.periodic(spacing=cfg.CONF.datasource_sync_period)
+    @periodics.periodic(spacing=cfg.CONF.sync_interval)
     @lockutils.synchronized('congress_synchronize_policies')
     def synchronize_all_policies(self):
         """Function to synchronize im-mem policies with DB"""
@@ -184,7 +184,7 @@ class PolicyRuleSynchronizer(object):
                           "task on node %s", self.node.node_id)
             return
 
-    @periodics.periodic(spacing=cfg.CONF.datasource_sync_period)
+    @periodics.periodic(spacing=cfg.CONF.sync_interval)
     @lockutils.synchronized('congress_synchronize_rules')
     def synchronize_rules(self):
         LOG.debug("Synchronizing rules on node %s", self.node.node_id)

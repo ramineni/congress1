@@ -78,7 +78,7 @@ class DatasourceSynchronizer(object):
             return
 
     @lockutils.synchronized('congress_synchronize_datasources')
-    @periodics.periodic(spacing=cfg.CONF.datasource_sync_period)
+    @periodics.periodic(spacing=cfg.CONF.sync_interval)
     def synchronize_all_datasources(self):
         LOG.info("synchronizing datasources on node %s", self.node.node_id)
         added = 0

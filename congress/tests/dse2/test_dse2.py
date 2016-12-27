@@ -21,7 +21,7 @@ import time
 #             which takes place before the confFixture is setup, fails w/o it
 from novaclient import client as nova_client
 from oslo_config import cfg
-cfg.CONF.datasource_sync_period = 0
+cfg.CONF.sync_interval = 0
 from oslo_messaging import conffixture
 
 from congress.api import base as api_base

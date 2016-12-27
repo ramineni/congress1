@@ -1,7 +1,7 @@
 [DEFAULT]
 bind_port = 4002
 auth_strategy = noauth
-datasource_sync_period = 5
+sync_interval = 5
 debug = True
 
 [database]
