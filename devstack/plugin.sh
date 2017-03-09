@@ -136,6 +136,11 @@ function create_predefined_policy {
 function configure_congressclient {
     setup_develop $CONGRESSCLIENT_DIR
 }
+
+function configure_congressdashboard {
+    setup_develop $CONGRESSDASHBOARD_DIR
+}
+
 # create_congress_cache_dir() - Part of the _congress_setup_keystone() process
 function create_congress_cache_dir {
     # Create cache dir
@@ -246,20 +251,9 @@ function _congress_setup_keystone {
 # Set up Horizon integration with Congress
 function _congress_setup_horizon {
     # Dashboard panels
-    cp $CONGRESS_HORIZON_DIR/enabled/_50_policy.py $HORIZON_DIR/openstack_dashboard/local/enabled/
-    cp $CONGRESS_HORIZON_DIR/enabled/_60_policies.py $HORIZON_DIR/openstack_dashboard/local/enabled/
-    cp $CONGRESS_HORIZON_DIR/enabled/_70_datasources.py $HORIZON_DIR/openstack_dashboard/local/enabled/
-
-    # For unit tests
-    echo "python-congressclient" >> $HORIZON_DIR/requirements.txt
-    echo -e \
-"\n# Load the pluggable dashboard settings"\
-"\nimport openstack_dashboard.local.enabled"\
-"\nfrom openstack_dashboard.utils import settings"\
-"\n\nINSTALLED_APPS = list(INSTALLED_APPS)"\
-"\nsettings.update_dashboards(["\
-"\n    openstack_dashboard.local.enabled,"\
-"\n], HORIZON_CONFIG, INSTALLED_APPS)" >> $HORIZON_DIR/openstack_dashboard/test/settings.py
+    cp $CONGRESSDASHBOARD_DIR/enabled/_50_policy.py $HORIZON_DIR/openstack_dashboard/local/enabled/
+    cp $CONGRESSDASHBOARD_DIR/enabled/_60_policies.py $HORIZON_DIR/openstack_dashboard/local/enabled/
+    cp $CONGRESSDASHBOARD_DIR/enabled/_70_datasources.py $HORIZON_DIR/openstack_dashboard/local/enabled/
 
     # Setup alias for django-admin which could be different depending on distro
     local django_admin
