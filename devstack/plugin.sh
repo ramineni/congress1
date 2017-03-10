@@ -39,7 +39,8 @@ function configure_congress {
     fi
     sudo chown $STACK_USER $CONGRESS_CONF_DIR
 
-    touch $CONGRESS_CONF
+    # Generate Congress configuration file and configure common parameters.
+    oslo-config-generator --config-file $CONGRESS_DIR/etc/congress-config-generator.conf --output-file $CONGRESS_CONF
     sudo chown $STACK_USER $CONGRESS_CONF
 
     # Format logging
@@ -59,10 +60,6 @@ function configure_congress {
     iniset $CONGRESS_CONF DEFAULT datasource_sync_period 30
     iniset $CONGRESS_CONF DEFAULT replicated_policy_engine "$CONGRESS_REPLICATED"
 
-    # if [ "$CONGRESS_MULTIPROCESS_DEPLOYMENT" == "False" ]; then
-    #    iniset $CONGRESS_CONF DEFAULT transport_url $CONGRESS_TRANSPORT_URL
-    # fi
-
     CONGRESS_DRIVERS="congress.datasources.neutronv2_driver.NeutronV2Driver,"
     CONGRESS_DRIVERS+="congress.datasources.glancev2_driver.GlanceV2Driver,"
     CONGRESS_DRIVERS+="congress.datasources.nova_driver.NovaDriver,"
@@ -81,7 +78,6 @@ function configure_congress {
     CONGRESS_DRIVERS+="congress.tests.fake_datasource.FakeDataSource"
 
     iniset $CONGRESS_CONF DEFAULT drivers $CONGRESS_DRIVERS
-
     iniset $CONGRESS_CONF database connection `database_connection_url $CONGRESS_DB_NAME`
 
     _congress_setup_keystone $CONGRESS_CONF keystone_authtoken
@@ -156,8 +152,7 @@ function create_congress_accounts {
 
         create_service_user "congress"
 
-        local congress_service=$(get_or_create_service "congress" \
-            "policy" "Congress Service")
+        local congress_service=$(get_or_create_service "congress" "policy" "Congress Service")
         get_or_create_endpoint $congress_service \
             "$REGION_NAME" \
             "http://$SERVICE_HOST:$CONGRESS_PORT/" \
