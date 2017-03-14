@@ -302,3 +302,14 @@ def datasource_statuses_list(request):
             wrapper.set_value(key, value)
         ds_status.append(wrapper)
     return ds_status
+
+
+def datasource_status_list(request, datasource_name):
+    client = congressclient(request)
+    try:
+        status = client.list_datasource_status(datasource_name)
+        return status
+    except Exception:
+        LOG.exception("Failed to retrieve status for datasource %s",
+                      datasource_name)
+        raise

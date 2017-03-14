@@ -23,12 +23,15 @@ SERVICES = (
 POLICIES = (
     r'^policies/(?P<datasource_id>[^/]+)/(?P<policy_table_name>[^/]+)/%s$')
 
+DATASOURCE = r'^(?P<datasource_id>[^/]+)/%s$'
 
 urlpatterns = patterns(
     '',
     url(r'^$', views.IndexView.as_view(), name='index'),
     url(SERVICES % 'detail', views.DetailView.as_view(),
         name='datasource_table_detail'),
+    url(DATASOURCE % 'detail', views.DatasourceView.as_view(),
+        name='datasource_detail'),
     url(POLICIES % 'detail', views.DetailView.as_view(),
         name='policy_table_detail'),
 )
