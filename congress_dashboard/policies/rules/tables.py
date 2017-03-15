@@ -42,6 +42,19 @@ class CreateRule(tables.LinkAction):
         return reverse(self.url, args=(policy_name,))
 
 
+class CreateRawRule(tables.LinkAction):                                                                    
+    name = 'create_raw_rule'                                                                                
+    verbose_name = _('Create Raw Rule')                                                                     
+    url = 'horizon:admin:policies:create_raw_rule'                                                          
+    classes = ('ajax-modal',)                                                                           
+    icon = 'plus'                                                                                       
+    policy_rules = (('policy', 'create_raw_rule'),)                                                         
+                                                                                                        
+    def get_link_url(self, datum=None):                                                                 
+        policy_name = self.table.kwargs['policy_name']                                                  
+        return reverse(self.url, args=(policy_name,))                                                   
+
+
 class DeleteRule(policy.PolicyTargetMixin, tables.DeleteAction):
     @staticmethod
     def action_present(count):
@@ -107,7 +120,7 @@ class PolicyRulesTable(tables.DataTable):
     class Meta(object):
         name = "policy_rules"
         verbose_name = _("Rules")
-        table_actions = (CreateRule, DeleteRule,)
+        table_actions = (CreateRule, CreateRawRule, DeleteRule,)
         row_actions = (DeleteRule,)
         hidden_title = False
 

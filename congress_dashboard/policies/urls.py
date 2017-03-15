@@ -33,4 +33,6 @@ urlpatterns = patterns(
         name='policy_table_detail'),
     url(POLICY % 'rules/create',
         rule_views.CreateView.as_view(), name='create_rule'),
+    url(POLICY % 'rules/create',
+        rule_views.CreateView.as_view(), name='create_raw_rule'),
 )
