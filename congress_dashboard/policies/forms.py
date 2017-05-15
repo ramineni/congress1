@@ -67,3 +67,37 @@ class CreatePolicy(forms.SelfHandlingForm):
             redirect = reverse(self.failure_url)
             raise exceptions.Http302(redirect)
         return policy
+
+class CreateRawRule(forms.SelfHandlingForm):
+    policy_name = forms.CharField(max_length=255, label=_("Policy Name"))
+    rule_name = forms.CharField(max_length=255, label=_("Rule Name"))
+    rule = forms.CharField(label=_("Rule"),
+                           widget=forms.Textarea(attrs={'rows': 10}))
+
+    def __init__(self, request, *args, **kwargs):
+        super(CreateRawRule, self).__init__(request, *args, **kwargs)
+        self.policy_name = self.initial['policy_name']
+
+    def handle(self, request, data):
+        LOG.info("anu: *************** request is %s", request)
+        name = data['rule_name']
+        rule = data['rule']
+        #policy_name = data['policy_name']
+
+        LOG.info('User %s creating policy "%s" rule "%s" in tenant %s: %s',
+                 username, policy_name, rule_name, project_name, rule)
+        try:
+            params = {
+                'name': rule_name,
+                'comment': comment,
+                'rule': rule,
+            }
+
+            rule = congress.policy_rule_create(request, self.policy_name,
+                                               body=params)
+            LOG.info('Created rule %s', rule['id'])
+            self.context['rule_id'] = rule['id']
+        except Exception as e:
+            LOG.error('Error creating policy "%s" rule "%s": %s',
+                      self.policy_name, rule_name, str(e))
+            self.context['error'] = str(e)

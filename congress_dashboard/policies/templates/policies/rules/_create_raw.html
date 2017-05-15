@@ -1,0 +1,26 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+{% load url from future %}
+
+{% block form_id %}create_raw_rule_form{% endblock %}
+{% block form_action %}{% url 'horizon:admin:policies:create_raw_rule' policy_name %}{% endblock %}
+
+{% block modal_id %}create_raw_rule_modal{% endblock %}
+{% block modal-header %}{% trans "Create Rule" %}{% endblock %}
+
+{% block modal-body %}
+<div class="left">
+  <fieldset>
+    {% include "horizon/common/_form_fields.html" %}
+  </fieldset>
+</div>
+<div class="right">
+    <h3>{% trans "Create new Rule:" %}</h3>
+    <p>{% trans "Create a new datasource with the any of the supported drivers listed."%}</p>
+    <p>{% trans "Congress uses a driver to connect each service to the policy engine. Connection details such as username, password, auth_url, tenant_name needed for congress to connect to respective service to be able poll data."%}</p>
+</div>
+{% endblock %}
+{% block modal-footer %}
+  <input class="btn btn-primary pull-right" type="submit" value="{% trans "Create " %}" />
+  <a href="{% url 'horizon:admin:policies:index' %}" class="btn btn-default secondary cancel close">{% trans "Cancel" %}</a>
+{% endblock %}

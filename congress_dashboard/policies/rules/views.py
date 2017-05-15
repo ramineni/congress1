@@ -14,7 +14,9 @@
 
 from django.core.urlresolvers import reverse
 from horizon import workflows
+from horizon import forms
 
+from congress_dashboard.policies import forms as policies_forms
 from congress_dashboard.policies.rules import workflows as rule_workflows
 
 
@@ -26,6 +28,19 @@ class CreateView(workflows.WorkflowView):
     def get_success_url(self):
         return reverse(self.success_url,
                        args=(self.kwargs['policy_name'],))
+
+    def get_initial(self):
+        return {'policy_name': self.kwargs['policy_name']}
+
+
+class CreateRawView(forms.ModalFormView):
+    form_class = policies_forms.CreateRawRule
+    template_name = 'admin/policies/rules/create_raw.html'
+    success_url = 'horizon:admin:policies:detail'
+    
+#    def get_success_url(self):
+#        return reverse(self.success_url,
+#                       args=(self.kwargs['policy_name'],))
 
     def get_initial(self):
         return {'policy_name': self.kwargs['policy_name']}
